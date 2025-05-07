@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Data Sweep</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+  <header>
+    <h1>Data Sweep</h1>
+  </header>
+
+  <div class="main">
+    <div id="upload-area" class="drop-area">
+      <i class="fas fa-upload upload-icon"></i>
+      <h3>Drag & drop file</h3>
+      <h3 class="or-text">OR</h3>
+      <button id="upload-button" class="upload-button">Click to upload file</button>
+      <h4 class="file-support-text">Only CSV files are supported</h4>
+      <input type="file" id="fileElem" accept=".csv" hidden>
+    </div>
+    <div id="loading-spinner" class="loading-spinner" hidden>
+      <div class="spinner"></div>
+      <p>File is uploading, please wait...</p>
+    </div>
+    <div id="csv-area" class="csv-area" hidden></div>
+    <div class="options-area">
+        <p>Cleaning options will appear here once a csv is uploaded.</p>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
