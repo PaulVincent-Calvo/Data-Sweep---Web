@@ -5,6 +5,12 @@ const loadingSpinner = document.getElementById('loading-spinner');
 const csvArea = document.getElementById('csv-area');
 const mainContent = document.querySelector('.main');
 
+// Add this at the top with your other constants
+const blurOverlay = document.createElement('div');
+blurOverlay.className = 'blur-overlay';
+document.body.appendChild(blurOverlay);
+blurOverlay.style.display = 'none';
+
 // Prevent double triggering of file input dialog
 uploadButton.addEventListener('click', (e) => {
   e.stopPropagation(); // Stop the event from propagating to the dropArea
@@ -37,8 +43,9 @@ function uploadFile(file) {
   const formData = new FormData();
   formData.append('file', file);
 
-  // Show the loading spinner and blur the background
+  // Show the loading spinner and blur overlay
   loadingSpinner.hidden = false;
+  blurOverlay.style.display = 'block';
   mainContent.classList.add('blurred');
 
   fetch('/upload', {
@@ -47,8 +54,9 @@ function uploadFile(file) {
   })
     .then(res => res.json())
     .then(data => {
-      // Hide the loading spinner and remove the blur
+      // Hide the loading spinner and blur overlay
       loadingSpinner.hidden = true;
+      blurOverlay.style.display = 'none';
       mainContent.classList.remove('blurred');
 
       if (data.error) {
@@ -70,8 +78,9 @@ function uploadFile(file) {
       }
     })
     .catch(err => {
-      // Hide the loading spinner and remove the blur
+      // Hide the loading spinner and blur overlay
       loadingSpinner.hidden = true;
+      blurOverlay.style.display = 'none';
       mainContent.classList.remove('blurred');
 
       alert('Error uploading file');
