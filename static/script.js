@@ -53,9 +53,20 @@ function uploadFile(file) {
 
       if (data.error) {
         alert(data.error);
-      } else {
-        displayTable(data.content);
-        populateColumnChecklist(data.columns); // Populate the column checklist
+      } else if (data.success && data.table) {
+        // Hide the drop area
+        dropArea.style.display = 'none';
+        
+        // Display the HTML table returned from the server
+        const csvArea = document.getElementById('csv-area');
+        csvArea.style.display = 'flex';
+        csvArea.innerHTML = data.table;
+        
+        // Add table styling
+        const table = csvArea.querySelector('table');
+        if (table) {
+          table.classList.add('table', 'table-striped', 'table-bordered');
+        }
       }
     })
     .catch(err => {
@@ -66,38 +77,4 @@ function uploadFile(file) {
       alert('Error uploading file');
       console.error(err);
     });
-}
-
-function displayTable(csvContent) {
-  const rows = csvContent.split('\n').filter(row => row.trim() !== '');
-  const table = document.createElement('table');
-  table.classList.add('csv-table');
-
-  rows.forEach((row, rowIndex) => {
-    const tr = document.createElement('tr');
-    const cells = row.split(',');
-
-    cells.forEach(cell => {
-      const cellElement = rowIndex === 0 ? document.createElement('th') : document.createElement('td');
-      cellElement.textContent = cell.trim();
-      tr.appendChild(cellElement);
-    });
-
-    table.appendChild(tr);
-  });
-
-  const tableContainer = document.createElement('div');
-  tableContainer.classList.add('csv-table-container');
-  tableContainer.appendChild(table);
-
-  const csvArea = document.getElementById('csv-area');
-  csvArea.style.display = 'flex'; // Make the CSV area visible
-  csvArea.innerHTML = ''; // Clear any existing content
-  csvArea.appendChild(tableContainer);
-
-  // Populate the column checklist
-  if (rows.length > 0) {
-    const columns = rows[0].split(',').map(col => col.trim());
-    populateColumnChecklist(columns);
-  }
 }

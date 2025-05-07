@@ -25,7 +25,7 @@ header {
     justify-content: center; 
     align-items: center; 
     width: 100%;
-    height: 7%;
+    height: 8%;
     background: #00AD46;
     color: white; 
     box-sizing: border-box; 
@@ -94,7 +94,7 @@ header {
     color: #666;
     font-family: 'Poppins', sans-serif;
     position: relative;
-    overflow: hidden; /* Prevent any overflow if needed */
+    overflow: hidden; 
 }
 
 .options-area{
@@ -124,13 +124,13 @@ header {
     
 }
 
-.csv-table {
+.table {
     width: 100%; /* Allow the table to grow horizontally */
     min-width: 100%; 
     border-collapse: collapse;
 }
 
-.csv-table th, .csv-table td {
+.table th, .table td {
     border: 2px solid #E0E0E1;
     text-align: left;
     padding: 8px; /* Reduce padding for smaller cells */

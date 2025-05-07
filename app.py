@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import os
+import pandas as pd
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -31,10 +32,18 @@ def upload_file():
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(filepath)
 
-        with open(filepath, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        return jsonify({'filename': filename, 'content': content})
+        try:
+            # Read CSV using pandas
+            df = pd.read_csv(filepath)
+            # Convert DataFrame to HTML table
+            table_html = df.to_html(classes='table table-striped', index=False)
+            return jsonify({
+                'filename': filename,
+                'table': table_html,
+                'success': True
+            })
+        except Exception as e:
+            return jsonify({'error': f'Error reading CSV: {str(e)}'}), 400
 
     return jsonify({'error': 'Only CSV files are accepted'}), 400
 
