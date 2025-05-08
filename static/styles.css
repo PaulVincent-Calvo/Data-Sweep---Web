@@ -60,7 +60,7 @@ header {
     border: none;
     border-radius: 5px;
     cursor: pointer;
-    margin: 10px 0; /* Reduce the spacing above and below the button */
+    margin: 10px 0; 
 }
 
 .upload-button:hover {
@@ -99,6 +99,7 @@ header {
 
 .options-area{
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     height: 100%;
@@ -109,6 +110,58 @@ header {
     border: 2px solid #181B1E;
     border-radius: 10px;
     font-family: 'Poppins', sans-serif;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.column-checklist {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 90%;
+    gap: 0;
+    padding: 0;
+    overflow-y: auto;
+    background: white;  
+    border-bottom: 2px solid #E0E0E1
+}
+
+.column-checklist h2 {
+    margin: 0;
+    padding: 10px 15px;  /* Reduced padding */
+    background: white;
+    color: #181B1E;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    padding: 10px 15px;
+    background: white;  /* All items have white background */
+    border-bottom: 2px solid #E0E0E1;  /* Changed to match table border */
+}
+
+/* Remove the alternating colors */
+.checkbox-item:nth-child(odd) {
+    background: white;  /* Changed to white instead of gray */
+}
+
+.checkbox-item:last-child {
+    border-bottom: none;
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.checkbox-item label {
+    cursor: pointer;
+    flex: 1;
 }
 
 #csv-area {
@@ -125,7 +178,7 @@ header {
 }
 
 .table {
-    width: 100%; /* Allow the table to grow horizontally */
+    width: 100%; 
     min-width: 100%; 
     border-collapse: collapse;
 }
@@ -133,14 +186,14 @@ header {
 .table th, .table td {
     border: 2px solid #E0E0E1;
     text-align: left;
-    padding: 8px; /* Reduce padding for smaller cells */
-    font-size: 14px; /* Reduce font size for smaller text */
-    white-space: nowrap; /* Prevent wrapping of text */
+    padding: 8px; 
+    font-size: 14px; 
+    white-space: nowrap; 
 }
 
 .csv-table-container {
     width: 100%;
-    overflow-x: auto; /* Enable horizontal scrolling */
+    overflow-x: auto; 
 }
 
 .loading-spinner {
@@ -149,14 +202,13 @@ header {
     left: 50%;
     transform: translate(-50%, -50%);
     text-align: center;
-    z-index: 1001; /* Increased z-index to ensure spinner stays above blurred content */
+    z-index: 1001; 
     background: rgba(255, 255, 255, 0.9); 
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Add this new class for the blur overlay */
 .blur-overlay {
     position: fixed;
     top: 0;
@@ -169,7 +221,6 @@ header {
     transition: backdrop-filter 0.3s ease;
 }
 
-/* Remove the blur filter from the existing .blurred class */
 .blurred {
     pointer-events: none;
 }
@@ -193,15 +244,46 @@ header {
     }
 }
 
-.csv-area {
-    flex: 1;
+.buttons-container {
+    display: flex;
+    height: 10%;
+    gap: 10px;
     width: 100%;
-    height: 400px;
-    overflow: auto;
+    justify-content: center;
     background: white;
-    border: 2px solid #ccc;
-    padding: 10px;
-    box-sizing: border-box;
 }
+
+.skip-button {
+    padding: 10px 20px;
+    font-size: 18px; 
+    font-weight: bold;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px 0; 
+}
+
+.delete-button {
+    padding: 10px 20px;
+    font-size: 18px; 
+    font-weight: bold;
+    color: white;
+    background-color: #00AD46;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px 0; 
+}
+
+.skip-button:hover {
+    background-color: #5a6268;
+}
+
+.delete-button:hover {
+    background-color: #008C3A;
+}
+
 
 

@@ -7,6 +7,8 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'csv'}
 
+dataClassifications = ["name", "date", "categorical", "non-categorical"]
+
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
@@ -35,10 +37,13 @@ def upload_file():
         try:
             # Read CSV using pandas
             df = pd.read_csv(filepath)
+            # Get column names
+            columns = df.columns.tolist()
             # Convert DataFrame to HTML table
             table_html = df.to_html(classes='table table-striped', index=False)
             return jsonify({
                 'filename': filename,
+                'columns': columns,
                 'table': table_html,
                 'success': True
             })
@@ -46,6 +51,38 @@ def upload_file():
             return jsonify({'error': f'Error reading CSV: {str(e)}'}), 400
 
     return jsonify({'error': 'Only CSV files are accepted'}), 400
+
+@app.route('/delete-columns', methods=['POST'])
+def delete_columns():
+    try:
+        data = request.get_json()
+        columns_to_delete = data.get('columns', [])
+        
+        # Read the current CSV file
+        files = os.listdir(app.config['UPLOAD_FOLDER'])
+        if not files:
+            return jsonify({'error': 'No CSV file found'}), 400
+            
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], files[-1])
+        df = pd.read_csv(filepath)
+        
+        # Delete selected columns
+        df = df.drop(columns=columns_to_delete)
+        
+        # Save the modified CSV
+        df.to_csv(filepath, index=False)
+        
+        # Convert updated DataFrame to HTML table
+        table_html = df.to_html(classes='table table-striped', index=False)
+        
+        return jsonify({
+            'success': True,
+            'table': table_html,
+            'columns': df.columns.tolist()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
