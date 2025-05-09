@@ -123,7 +123,7 @@ header {
     padding: 0;
     overflow-y: auto;
     background: white;  
-    border-bottom: 2px solid #E0E0E1
+    border-bottom: 2px solid #E0E0E1;
 }
 
 .column-checklist h2 {
@@ -284,6 +284,218 @@ header {
 .delete-button:hover {
     background-color: #008C3A;
 }
+
+/* Classification Interface Styling */
+.classification-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    gap: 0;
+    padding: 0;
+    background: white;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+.column-list-container {
+    display: flex;
+    flex-direction: column;
+    height: 90%;
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+/* Style the title similar to checklist title */
+.classification-container h3 {
+    margin: 0;
+    padding: 10px 15px;
+    background: white;
+    color: #181B1E;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+.column-classification {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 14px;
+    padding: 10px 15px;
+    background: white;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+.column-name {
+    display: flex;
+    min-width: 150px;
+    padding-right: 10px;
+    border: none;
+    overflow: hidden;
+}
+
+.column-name p {
+    margin: 0;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis; 
+}
+
+.column-classification:first-child {
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+
+.column-classification:last-child {
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+    border-bottom: 1px solid #E0E0E1;
+}
+
+.classification-select {
+    padding: 8px 12px;
+    border: 2px solid #E0E0E1;
+    border-radius: 4px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    color: #333;
+    background-color: white;
+    cursor: pointer;
+}
+
+.classification-select:hover {
+    border-color: #00AD46;
+}
+
+.classification-select:focus {
+    outline: none;
+    border-color: #00AD46;
+    box-shadow: 0 0 0 2px rgba(0, 173, 70, 0.2);
+}
+
+/* Add submit button container similar to buttons-container */
+.submit-button-container {
+    height:10%;
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    padding: 10px 0;
+}
+
+.submit-button {
+    padding: 10px 20px;
+    font-size: 18px;
+    font-weight: bold;
+    color: white;
+    background-color: #00AD46;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px 0;
+}
+
+.submit-button:hover {
+    background-color: #008C3A;
+}
+
+/* Name cleaning options styling */
+.name-format-options, .name-empty-options {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 90%;
+    background: white;
+    border: 1px solid red;
+}
+
+/* Style the titles similar to classification title */
+.name-format-options h3, .name-empty-options h3 {
+    margin: 0;
+    padding: 10px 15px;
+    background: white;
+    color: #181B1E;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+/* Container for the list of items */
+.name-options-list {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.name-column-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 14px;
+    padding: 10px 15px;
+    background: white;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+/* Button containers at bottom */
+.format-button-container, .empty-button-container {
+    display: flex;
+    height: 10%;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    border-top: 2px solid #E0E0E1;
+    margin-top: auto;
+    border: 1px solid yellow;
+}
+
+
+.format-submit-button, .empty-submit-button, .next-step-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    background-color: #00AD46;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 10px 0;
+}
+
+.format-submit-button:hover, .empty-submit-button:hover, .next-step-button:hover {
+    background-color: #008C3A;
+}
+
+.next-step-button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+/* Update dropdown styling to be consistent */
+.format-select, .classification-select {
+    padding: 8px 12px;
+    border: 2px solid #E0E0E1;
+    border-radius: 4px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    color: #333;
+    background-color: white;
+    cursor: pointer;
+    width: 200px;
+}
+
+.format-select:hover, .classification-select:hover {
+    border-color: #00AD46;
+}
+
+.format-select:focus, .classification-select:focus {
+    outline: none;
+    border-color: #00AD46;
+    box-shadow: 0 0 0 2px rgba(0, 173, 70, 0.2);
+}
+
 
 
 
