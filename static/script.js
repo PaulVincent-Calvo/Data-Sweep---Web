@@ -5,7 +5,6 @@ const loadingSpinner = document.getElementById('loading-spinner');
 const csvArea = document.getElementById('csv-area');
 const mainContent = document.querySelector('.main');
 
-
 const blurOverlay = document.createElement('div');
 blurOverlay.className = 'blur-overlay';
 document.body.appendChild(blurOverlay);
@@ -178,6 +177,9 @@ function uploadFile(file) {
                             checkbox.closest('.checkbox-item').remove();
                         }
                     });
+
+                    // Show classification interface
+                    showClassificationInterface();
                 } else {
                     alert('Error deleting columns');
                 }
@@ -193,6 +195,11 @@ function uploadFile(file) {
                 mainContent.classList.remove('blurred');
             });
         });
+
+        // Add this to your skip button click handler
+        skipButton.addEventListener('click', () => {
+            showClassificationInterface();
+        });
       }
     })
     .catch(err => {
@@ -202,4 +209,356 @@ function uploadFile(file) {
       alert('Error uploading file');
       console.error(err);
     });
+}
+
+// Add these functions to script.js
+
+function showClassificationInterface() {
+    // Hide loading spinner if visible
+    loadingSpinner.hidden = true;
+    blurOverlay.style.display = 'none';
+    mainContent.classList.remove('blurred');
+
+    fetch('/show-classification', {
+        method: 'POST'
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(`Server error: ${err.error || 'Unknown error'}`);
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'Unknown error');
+        }
+        const optionsArea = document.querySelector('.options-area');
+        optionsArea.innerHTML = ''; // Clear previous content
+
+        // Create a wrapper div for all column classifications
+        const columnListContainer = document.createElement('div');
+        columnListContainer.className = 'column-list-container';
+
+        // Create classification container
+        const classificationContainer = document.createElement('div');
+        classificationContainer.className = 'classification-container';
+
+        // Add title
+        const title = document.createElement('h3');
+        title.textContent = 'Classify Your Data Columns';
+        classificationContainer.appendChild(title);
+        
+        // Add columns to the column list container
+        data.columns.forEach(column => {
+            const columnDiv = document.createElement('div');
+            columnDiv.className = 'column-classification';
+
+            // Create a div to wrap the column name
+            const columnNameDiv = document.createElement('div');
+            columnNameDiv.className = 'column-name';
+
+            const columnName = document.createElement('p');
+            columnName.textContent = column;
+            columnNameDiv.appendChild(columnName); // Add p to the wrapper div
+            columnDiv.appendChild(columnNameDiv); // Add wrapper div to columnDiv
+
+            const select = document.createElement('select');
+            select.id = `classification-${column}`;
+            select.className = 'classification-select';
+
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Select classification';
+            defaultOption.selected = true;
+            select.appendChild(defaultOption);
+
+            // Add classification options
+            data.classifications.forEach(classification => {
+                const option = document.createElement('option');
+                option.value = classification;
+                option.textContent = classification;
+                select.appendChild(option);
+            });
+
+            columnDiv.appendChild(select);
+            columnListContainer.appendChild(columnDiv);
+        });
+
+        // Add column list container to classification container
+        classificationContainer.appendChild(columnListContainer);
+
+        // Create submit button container
+        const submitButtonContainer = document.createElement('div');
+        submitButtonContainer.className = 'submit-button-container';
+
+        // Create submit button
+        const submitButton = document.createElement('button');
+        submitButton.textContent = 'Submit Classifications';
+        submitButton.className = 'submit-button';
+        submitButton.onclick = submitClassifications;
+
+        // Add button to container
+        submitButtonContainer.appendChild(submitButton);
+        classificationContainer.appendChild(submitButtonContainer);
+
+        optionsArea.appendChild(classificationContainer);
+    })
+    .catch(err => {
+        console.error('Classification interface error:', err);
+        alert(`Error loading classification interface: ${err.message}`);
+    });
+}
+
+// Add this function after showClassificationInterface()
+function submitClassifications() {
+    // Get all classification select elements
+    const selects = document.querySelectorAll('.classification-select');
+    
+    // Create an object to store column classifications
+    const classifications = {};
+    
+    // Check if all columns are classified
+    let isValid = true;
+    selects.forEach(select => {
+        if (!select.value) {
+            isValid = false;
+            select.style.borderColor = 'red';
+        } else {
+            select.style.borderColor = '#E0E0E1';
+            // Get column name from the select id (removes 'classification-' prefix)
+            const columnName = select.id.replace('classification-', '');
+            classifications[columnName] = select.value;
+        }
+    });
+
+    if (!isValid) {
+        alert('Please classify all columns before submitting');
+        return;
+    }
+
+    // Show loading spinner
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    // Send classifications to server
+    fetch('/submit-classifications', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ classifications })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const optionsArea = document.querySelector('.options-area');
+            optionsArea.innerHTML = '';
+
+            // Filter columns by classification type
+            const nameColumns = Object.entries(classifications)
+                .filter(([_, type]) => type === 'Name')
+                .map(([column]) => column);
+
+            if (nameColumns.length > 0) {
+                // Check empty fields only for name columns
+                checkEmptyFields(nameColumns, 'Name')
+                    .then(data => {
+                        const optionsArea = document.querySelector('.options-area');
+                        optionsArea.innerHTML = '';
+
+                        // Create format options div
+                        const nameFormatDiv = document.createElement('div');
+                        nameFormatDiv.className = 'name-format-options';
+
+                        const formatTitle = document.createElement('h3');
+                        formatTitle.textContent = 'Format Name Columns';
+                        nameFormatDiv.appendChild(formatTitle);
+
+                        // Add format options for each name column
+                        nameColumns.forEach(column => {
+                            const columnDiv = document.createElement('div');
+                            columnDiv.className = 'name-column-item';
+
+                            const label = document.createElement('span');
+                            label.className = 'name-column-label';
+                            label.textContent = column;
+
+                            const select = document.createElement('select');
+                            select.className = 'format-select';
+                            select.id = `format-${column}`;
+
+                            const options = ['UPPERCASE', 'lowercase', 'Title Case', 'Sentence case'];
+                            options.forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt.toLowerCase().replace(' ', '-');
+                                option.textContent = opt;
+                                select.appendChild(option);
+                            });
+
+                            columnDiv.appendChild(label);
+                            columnDiv.appendChild(select);
+                            nameFormatDiv.appendChild(columnDiv);
+                        });
+
+                        // Add format submit button container
+                        const formatButtonContainer = document.createElement('div');
+                        formatButtonContainer.className = 'format-button-container';
+                        const formatSubmitBtn = document.createElement('button');
+                        formatSubmitBtn.className = 'format-submit-button';
+                        formatSubmitBtn.textContent = 'Apply Format';
+                        formatButtonContainer.appendChild(formatSubmitBtn);
+
+
+                        // If there are empty fields, create empty fields options
+                        if (data.hasEmptyFields) {
+                            // Create empty fields options div FIRST
+                            nameFormatDiv.style.display = 'none';
+                            formatButtonContainer.style.display = 'none';
+                            const emptyOptionsContainer = document.createElement('div');
+                            emptyOptionsContainer.className = 'empty-container';
+                            const emptyOptionsDiv = document.createElement('div');
+                            emptyOptionsDiv.className = 'name-empty-options';
+                            optionsArea.appendChild(emptyOptionsDiv);
+                            const emptyTitle = document.createElement('h3');
+                            emptyTitle.textContent = 'Handle Empty Fields';
+                            emptyOptionsDiv.appendChild(emptyTitle);
+
+                            // Add empty field options for columns with empty fields
+                            data.columnsWithEmpty.forEach(column => {
+                                const columnDiv = document.createElement('div');
+                                columnDiv.className = 'name-column-item';
+
+                                const label = document.createElement('span');
+                                label.className = 'name-column-label';
+                                label.textContent = column;
+
+                                const select = document.createElement('select');
+                                select.className = 'format-select';
+                                select.id = `empty-${column}`;
+
+                                const options = ['Delete empty rows', 'Fill with "None"', 'Fill with "Unknown"', 'Fill with "N/A"'];
+                                options.forEach(opt => {
+                                    const option = document.createElement('option');
+                                    option.value = opt.toLowerCase().replace(/ /g, '-');
+                                    option.textContent = opt;
+                                    select.appendChild(option);
+                                });
+
+                                columnDiv.appendChild(label);
+                                columnDiv.appendChild(select);
+                                emptyOptionsDiv.appendChild(columnDiv);
+                            });
+
+                            // Add empty fields submit button container
+                            const emptyButtonContainer = document.createElement('div');
+                            emptyButtonContainer.className = 'empty-button-container';
+                            const emptySubmitBtn = document.createElement('button');
+                            emptySubmitBtn.className = 'empty-submit-button';
+                            emptySubmitBtn.textContent = 'Apply Empty Field Handling';
+                            emptyButtonContainer.appendChild(emptySubmitBtn);
+                            optionsArea.appendChild(emptyButtonContainer);
+
+                            // Hide format options initially
+                            nameFormatDiv.style.display = 'none';
+
+                            // Add event listener for empty fields submit
+                            emptySubmitBtn.addEventListener('click', () => {
+                                // Get all empty field handling selections for name fields
+                                const emptySelects = document.querySelectorAll('.name-empty-options select');
+                                const nameEmptyHandling = {};
+                                
+                                // Create object with name column names and their empty field handling choice
+                                emptySelects.forEach(select => {
+                                    const columnName = select.id.replace('empty-', '');
+                                    nameEmptyHandling[columnName] = select.value;
+                                });
+
+                                // Show loading spinner
+                                loadingSpinner.hidden = false;
+                                blurOverlay.style.display = 'block';
+                                mainContent.classList.add('blurred');
+
+                                // Send empty field handling choices to server
+                                fetch('/handle-empty-name-fields', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ nameEmptyHandling })
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        // Update the table preview with the modified data
+                                        csvArea.innerHTML = data.table;
+                                        const table = csvArea.querySelector('table');
+                                        if (table) {
+                                            table.classList.add('table', 'table-striped', 'table-bordered');
+                                        }
+
+                                        // Show the name format options after handling empty fields
+                                        nameFormatDiv.style.display = 'block';
+                                        emptyOptionsDiv.style.display = 'none';
+                                        emptyButtonContainer.style.display = 'none';
+                                    } else {
+                                        throw new Error(data.error || 'Failed to handle empty name fields');
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error('Error handling empty name fields:', err);
+                                    alert(`Error: ${err.message}`);
+                                })
+                                .finally(() => {
+                                    // Hide loading spinner
+                                    loadingSpinner.hidden = true;
+                                    blurOverlay.style.display = 'none';
+                                    mainContent.classList.remove('blurred');
+                                });
+                            });
+
+                        } else {
+                            nameFormatDiv.style.display = 'block';
+                            formatButtonContainer.style.display = 'block';
+                        }
+
+                        // Add format div (will be hidden if there are empty fields)
+                        optionsArea.appendChild(nameFormatDiv);
+                        optionsArea.appendChild(formatButtonContainer);
+                        // Add event listener for format submit
+                        formatSubmitBtn.addEventListener('click', () => {
+                            nameFormatDiv.style.display = 'none';
+                        });
+                    });
+            }
+        } else {
+            throw new Error(data.error || 'Failed to submit classifications');
+        }
+    })
+    .catch(err => {
+        console.error('Error submitting classifications:', err);
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function checkEmptyFields(columns, classificationType) {
+    return fetch('/check-empty-fields', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            columns: columns,
+            classificationType: classificationType 
+        })
+    })
+    .then(res => res.json());
 }
