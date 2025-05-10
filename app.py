@@ -157,5 +157,49 @@ def check_empty_fields():
             'error': str(e)
         }), 400
 
+@app.route('/handle-empty-name-fields', methods=['POST'])
+def handle_empty_name_fields():
+    try:
+        data = request.get_json()
+        name_empty_handling = data.get('nameEmptyHandling', {})
+        
+        # Read the current CSV file
+        files = os.listdir(app.config['UPLOAD_FOLDER'])
+        if not files:
+            return jsonify({'error': 'No CSV file found'}), 400
+            
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], files[-1])
+        df = pd.read_csv(filepath)
+        
+        # Process each name column according to the empty handling choice
+        for column, handling in name_empty_handling.items():
+            if handling == 'delete-empty-rows':
+                # Delete rows where this name column is empty
+                df = df.dropna(subset=[column])
+            elif handling == 'fill-with-"none"':
+                df[column].fillna('None', inplace=True)
+            elif handling == 'fill-with-"unknown"':
+                df[column].fillna('Unknown', inplace=True)
+            elif handling == 'fill-with-"n/a"':
+                df[column].fillna('N/A', inplace=True)
+        
+        # Save the modified DataFrame
+        df.to_csv(filepath, index=False)
+        
+        # Convert updated DataFrame to HTML table
+        table_html = df.to_html(classes='table table-striped', index=False)
+        
+        return jsonify({
+            'success': True,
+            'table': table_html,
+            'message': 'Empty name fields handled successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
 if __name__ == '__main__':
     app.run(debug=True)

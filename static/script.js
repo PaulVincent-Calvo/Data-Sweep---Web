@@ -411,14 +411,18 @@ function submitClassifications() {
                         formatSubmitBtn.className = 'format-submit-button';
                         formatSubmitBtn.textContent = 'Apply Format';
                         formatButtonContainer.appendChild(formatSubmitBtn);
-                        nameFormatDiv.appendChild(formatButtonContainer);
+
 
                         // If there are empty fields, create empty fields options
                         if (data.hasEmptyFields) {
                             // Create empty fields options div FIRST
+                            nameFormatDiv.style.display = 'none';
+                            formatButtonContainer.style.display = 'none';
+                            const emptyOptionsContainer = document.createElement('div');
+                            emptyOptionsContainer.className = 'empty-container';
                             const emptyOptionsDiv = document.createElement('div');
                             emptyOptionsDiv.className = 'name-empty-options';
-
+                            optionsArea.appendChild(emptyOptionsDiv);
                             const emptyTitle = document.createElement('h3');
                             emptyTitle.textContent = 'Handle Empty Fields';
                             emptyOptionsDiv.appendChild(emptyTitle);
@@ -456,39 +460,78 @@ function submitClassifications() {
                             emptySubmitBtn.className = 'empty-submit-button';
                             emptySubmitBtn.textContent = 'Apply Empty Field Handling';
                             emptyButtonContainer.appendChild(emptySubmitBtn);
-                            emptyOptionsDiv.appendChild(emptyButtonContainer);
+                            optionsArea.appendChild(emptyButtonContainer);
 
                             // Hide format options initially
                             nameFormatDiv.style.display = 'none';
 
                             // Add event listener for empty fields submit
                             emptySubmitBtn.addEventListener('click', () => {
-                                nameFormatDiv.style.display = 'block';
-                                emptyOptionsDiv.style.display = 'none';
+                                // Get all empty field handling selections for name fields
+                                const emptySelects = document.querySelectorAll('.name-empty-options select');
+                                const nameEmptyHandling = {};
+                                
+                                // Create object with name column names and their empty field handling choice
+                                emptySelects.forEach(select => {
+                                    const columnName = select.id.replace('empty-', '');
+                                    nameEmptyHandling[columnName] = select.value;
+                                });
+
+                                // Show loading spinner
+                                loadingSpinner.hidden = false;
+                                blurOverlay.style.display = 'block';
+                                mainContent.classList.add('blurred');
+
+                                // Send empty field handling choices to server
+                                fetch('/handle-empty-name-fields', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ nameEmptyHandling })
+                                })
+                                .then(res => res.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        // Update the table preview with the modified data
+                                        csvArea.innerHTML = data.table;
+                                        const table = csvArea.querySelector('table');
+                                        if (table) {
+                                            table.classList.add('table', 'table-striped', 'table-bordered');
+                                        }
+
+                                        // Show the name format options after handling empty fields
+                                        nameFormatDiv.style.display = 'block';
+                                        emptyOptionsDiv.style.display = 'none';
+                                        emptyButtonContainer.style.display = 'none';
+                                    } else {
+                                        throw new Error(data.error || 'Failed to handle empty name fields');
+                                    }
+                                })
+                                .catch(err => {
+                                    console.error('Error handling empty name fields:', err);
+                                    alert(`Error: ${err.message}`);
+                                })
+                                .finally(() => {
+                                    // Hide loading spinner
+                                    loadingSpinner.hidden = true;
+                                    blurOverlay.style.display = 'none';
+                                    mainContent.classList.remove('blurred');
+                                });
                             });
 
-                            // Add empty options div first
-                            optionsArea.appendChild(emptyOptionsDiv);
+                        } else {
+                            nameFormatDiv.style.display = 'block';
+                            formatButtonContainer.style.display = 'block';
                         }
 
                         // Add format div (will be hidden if there are empty fields)
                         optionsArea.appendChild(nameFormatDiv);
-
-                        // Add next step button
-                        const nextStepBtn = document.createElement('button');
-                        nextStepBtn.className = 'next-step-button';
-                        nextStepBtn.textContent = 'Next Step';
-                        nextStepBtn.disabled = true;
-                        nextStepBtn.style.display = 'none';
-
+                        optionsArea.appendChild(formatButtonContainer);
                         // Add event listener for format submit
                         formatSubmitBtn.addEventListener('click', () => {
-                            nextStepBtn.style.display = 'block';
-                            nextStepBtn.disabled = false;
                             nameFormatDiv.style.display = 'none';
                         });
-
-                        optionsArea.appendChild(nextStepBtn);
                     });
             }
         } else {
@@ -500,7 +543,6 @@ function submitClassifications() {
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
-        // Hide loading spinner
         loadingSpinner.hidden = true;
         blurOverlay.style.display = 'none';
         mainContent.classList.remove('blurred');
