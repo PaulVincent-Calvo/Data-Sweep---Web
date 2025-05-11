@@ -184,10 +184,6 @@ function uploadFile(file) {
                     alert('Error deleting columns');
                 }
             })
-            .catch(err => {
-                console.error(err);
-                alert('Error deleting columns');
-            })
             .finally(() => {
                 loadingSpinner.hidden = true;
                 blurOverlay.style.display = 'none';
@@ -206,7 +202,6 @@ function uploadFile(file) {
       blurOverlay.style.display = 'none';
       mainContent.classList.remove('blurred');
       alert('Error uploading file');
-      console.error(err);
     });
 }
 
@@ -306,7 +301,6 @@ function showClassificationInterface() {
         optionsArea.appendChild(classificationContainer);
     })
     .catch(err => {
-        console.error('Classification interface error:', err);
         alert(`Error loading classification interface: ${err.message}`);
     });
 }
@@ -369,24 +363,46 @@ function submitClassifications() {
                 .filter(([_, type]) => type === 'Categorical')
                 .map(([column]) => column);
 
-            // Start with non-categorical data
-            if (nameColumns.length > 0) {
-                handleNonCategoricalData(nameColumns, classifications);
-            } else if (dateColumns.length > 0) {
-                handleDateData(dateColumns, classifications);
-            } else if (categoricalColumns.length > 0) {
-                handleCategoricalData(categoricalColumns, classifications);
-            }
+            const numericalColumns = Object.entries(classifications)
+                .filter(([_, type]) => type === 'Numerical')
+                .map(([column]) => column);
 
-            // Store the remaining columns for later use
+            // Store all columns for later use
+            sessionStorage.setItem('remainingNameColumns', JSON.stringify(nameColumns));
             sessionStorage.setItem('remainingDateColumns', JSON.stringify(dateColumns));
             sessionStorage.setItem('remainingCategoricalColumns', JSON.stringify(categoricalColumns));
+            sessionStorage.setItem('remainingNumericalColumns', JSON.stringify(numericalColumns));
+
+            // Start with non-categorical empty fields
+            if (nameColumns.length > 0) {
+                checkEmptyFields(nameColumns, 'Non-categorical')
+                    .then(data => {
+                        if (data.hasEmptyFields) {
+                            handleNonCategoricalData(nameColumns, true);  // true indicates starting with empty fields
+                        } else {
+                            // If no empty fields, go straight to formatting
+                            handleNonCategoricalData(nameColumns, false);
+                        }
+                    });
+            } else if (dateColumns.length > 0) {
+                checkEmptyFields(dateColumns, 'Date')
+                    .then(data => {
+                        if (data.hasEmptyFields) {
+                            handleDateData(dateColumns, true);
+                        } else {
+                            handleDateData(dateColumns, false);
+                        }
+                    });
+            } else if (categoricalColumns.length > 0) {
+                handleCategoricalData(categoricalColumns);
+            } else if (numericalColumns.length > 0) {
+                handleNumericalData(numericalColumns);
+            }
         } else {
             throw new Error(data.error || 'Failed to submit classifications');
         }
     })
     .catch(err => {
-        console.error('Error submitting classifications:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
@@ -597,7 +613,6 @@ function handleEmptyFieldSubmit(columns, type, formatContainer) {
         }
     })
     .catch(err => {
-        console.error('Error handling empty fields:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
@@ -653,24 +668,53 @@ function handleFormatSubmit(columns, type) {
                 optionsWrapper.remove();
             }
 
-            // Chain to next type
+            // Remove the processed columns from storage
             if (type === 'Non-categorical') {
+                sessionStorage.setItem('remainingNameColumns', '[]');
+            } else if (type === 'Date') {
+                sessionStorage.setItem('remainingDateColumns', '[]');
+            } else if (type === 'Categorical') {
+                sessionStorage.setItem('remainingCategoricalColumns', '[]');
+            }
+
+            // Check if all processing is complete
+            if (!checkAllProcessingComplete()) {
+                // Continue with the existing chain logic
                 const dateColumns = JSON.parse(sessionStorage.getItem('remainingDateColumns') || '[]');
-                if (dateColumns.length > 0) {
-                    handleDateData(dateColumns);
-                } else {
+                if (type === 'Non-categorical' && dateColumns.length > 0) {
+                    checkEmptyFields(dateColumns, 'Date')
+                        .then(data => {
+                            if (data.hasEmptyFields) {
+                                handleDateData(dateColumns, true);
+                            } else {
+                                handleDateData(dateColumns, false);
+                            }
+                        });
+                } else if (type === 'Date') {
                     const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
                     if (categoricalColumns.length > 0) {
                         handleCategoricalData(categoricalColumns);
+                    } else {
+                        const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+                        if (numericalColumns.length > 0) {
+                            handleNumericalData(numericalColumns);
+                        }
                     }
+                } else if (type === 'Categorical') {
+                    fetch('/get-unique-values', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ columns })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            handleCategoricalStandardization(columns);
+                        }
+                    });
                 }
-            } else if (type === 'Date') {
-                const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
-                if (categoricalColumns.length > 0) {
-                    handleCategoricalData(categoricalColumns);
-                }
-            } else if (type === 'Categorical') {
-                handleCategoricalStandardization(columns);
             }
 
             alert(`${type} formatting applied successfully!`);
@@ -679,7 +723,6 @@ function handleFormatSubmit(columns, type) {
         }
     })
     .catch(err => {
-        console.error('Error applying formats:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
@@ -714,12 +757,10 @@ function createFormatContainer(columns, hidden) {
 
 function createDateFormatContainer(columns, hidden) {
     const dateFormatOptions = [
+        { value: '', label: 'Select date format' }, // Add default option
         { value: 'mm/dd/yyyy', label: 'MM/DD/YYYY' },
         { value: 'dd/mm/yyyy', label: 'DD/MM/YYYY' },
-        { value: 'yyyy/mm/dd', label: 'YYYY/MM/DD' },
-        { value: 'mm-dd-yyyy', label: 'MM-DD-YYYY' },
-        { value: 'dd-mm-yyyy', label: 'DD-MM-YYYY' },
-        { value: 'yyyy-mm-dd', label: 'YYYY-MM-DD' }
+        { value: 'yyyy/mm/dd', label: 'YYYY/MM/DD' }
     ];
 
     const container = createOptionsContainer(
@@ -925,8 +966,19 @@ function handleStandardizationSubmit(columns, uniqueValues) {
                 optionsWrapper.remove();
             }
 
-            // Add this line to handle empty fields after standardization
-            handleCategoricalEmptyFields(columns);
+            // Check for empty fields after standardization
+            checkEmptyFields(columns, 'Categorical')
+                .then(data => {
+                    if (data.hasEmptyFields) {
+                        handleCategoricalEmptyFields(columns);
+                    } else {
+                        // If no empty fields, move to numerical data
+                        const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+                        if (numericalColumns.length > 0) {
+                            handleNumericalData(numericalColumns);
+                        }
+                    }
+                });
 
             alert('Standardization applied successfully!');
         } else {
@@ -934,7 +986,6 @@ function handleStandardizationSubmit(columns, uniqueValues) {
         }
     })
     .catch(err => {
-        console.error('Error applying standardization:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
@@ -954,8 +1005,8 @@ function handleCategoricalEmptyFields(columns) {
             if (data.hasEmptyFields) {
                 const emptyFieldsOptions = [
                     { value: 'delete-empty-rows', label: 'Delete empty rows' },
-                    { value: 'fill-mode', label: 'Fill with mode (most common value)' },
-                    { value: 'fill-mean', label: 'Fill with mean (average rank)' }
+                    { value: 'fill-mode', label: 'Fill with mode' },
+                    { value: 'fill-mean', label: 'Fill with mean' }
                 ];
 
                 const emptyContainer = createOptionsContainer(
@@ -1024,12 +1075,11 @@ function handleCategoricalEmptyFieldSubmit(columns) {
                 optionsWrapper.remove();
             }
 
-            // Show completion message
-            const optionsArea = document.querySelector('.options-area');
-            const completionMessage = document.createElement('div');
-            completionMessage.className = 'completion-message';
-            completionMessage.textContent = 'Categorical data processing complete!';
-            optionsArea.appendChild(completionMessage);
+            // Instead of showing completion message, move to numerical data
+            const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+            if (numericalColumns.length > 0) {
+                handleNumericalData(numericalColumns);
+            }
 
             alert('Empty fields handled successfully!');
         } else {
@@ -1037,7 +1087,6 @@ function handleCategoricalEmptyFieldSubmit(columns) {
         }
     })
     .catch(err => {
-        console.error('Error handling empty categorical fields:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
@@ -1045,4 +1094,284 @@ function handleCategoricalEmptyFieldSubmit(columns) {
         blurOverlay.style.display = 'none';
         mainContent.classList.remove('blurred');
     });
+}
+
+function handleNumericalData(columns) {
+    const optionsArea = document.querySelector('.options-area');
+    optionsArea.innerHTML = '';
+
+    const optionsWrapper = document.createElement('div');
+    optionsWrapper.className = 'options-wrapper';
+
+    // Updated rounding options with new "Keep original" option
+    const roundingOptions = [
+        { value: '', label: 'Select rounding precision' }, // Default option
+        { value: 'keep', label: 'Keep original numbers' },
+        { value: 'whole', label: 'Round to nearest whole number' },
+        { value: 'tenths', label: 'Round to nearest tenth (0.1)' },
+        { value: 'hundredths', label: 'Round to nearest hundredth (0.01)' },
+        { value: 'thousandths', label: 'Round to nearest thousandth (0.001)' },
+        { value: 'ten-thousandths', label: 'Round to nearest ten-thousandth (0.0001)' }
+    ];
+
+    const roundingContainer = createOptionsContainer(
+        'Round Numerical Values',
+        columns,
+        roundingOptions,
+        () => handleRoundingSubmit(columns),
+        'Apply Rounding'
+    );
+
+    const selects = roundingContainer.querySelectorAll('.format-select');
+    selects.forEach(select => {
+        select.style.width = '250px';
+    });
+
+    optionsWrapper.appendChild(roundingContainer);
+    optionsArea.appendChild(optionsWrapper);
+}
+
+function handleRoundingSubmit(columns) {
+    const selections = {};
+    columns.forEach(column => {
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    if (Object.values(selections).some(val => !val)) {
+        alert('Please select rounding precision for all columns');
+        return;
+    }
+
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    fetch('/apply-numerical-rounding', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(err.error || 'Server error occurred');
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Chain to empty fields handling
+            checkEmptyFields(columns, 'Numerical')
+                .then(data => {
+                    if (data.hasEmptyFields) {
+                        handleNumericalEmptyFields(columns);
+                    }
+                });
+
+            alert('Numerical formatting applied successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to apply numerical formatting');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function handleNumericalEmptyFields(columns) {
+    checkEmptyFields(columns, 'Numerical')
+        .then(data => {
+            const optionsArea = document.querySelector('.options-area');
+            const newOptionsWrapper = document.createElement('div');
+            newOptionsWrapper.className = 'options-wrapper';
+
+            if (data.hasEmptyFields) {
+                const emptyFieldsOptions = [
+                    { value: 'delete-empty-rows', label: 'Delete empty rows' },
+                    { value: 'fill-mean', label: 'Fill with mean value' },
+                    { value: 'fill-median', label: 'Fill with median value' },
+                    { value: 'fill-mode', label: 'Fill with mode value' }
+                ];
+
+                const emptyContainer = createOptionsContainer(
+                    'Handle Empty Numerical Fields',
+                    data.columnsWithEmpty,
+                    emptyFieldsOptions,
+                    () => handleNumericalEmptyFieldSubmit(data.columnsWithEmpty),
+                    'Apply Empty Field Handling'
+                );
+
+                newOptionsWrapper.appendChild(emptyContainer);
+                optionsArea.appendChild(newOptionsWrapper);
+            } else {
+                const completionMessage = document.createElement('div');
+                completionMessage.className = 'completion-message';
+                completionMessage.textContent = 'Numerical data processing complete!';
+                optionsArea.appendChild(completionMessage);
+            }
+        });
+}
+
+function handleNumericalEmptyFieldSubmit(columns) {
+    const selections = {};
+    columns.forEach(column => {
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    fetch('/handle-empty-numerical-fields', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(err.error || 'Server error occurred');
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update table
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            // Remove the options container
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Clear numerical columns from storage
+            sessionStorage.setItem('remainingNumericalColumns', '[]');
+
+            // Check if all processing is complete
+            checkAllProcessingComplete();
+
+            alert('Empty fields handled successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to handle empty fields');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+// Add new function for download page
+function showDownloadPage() {
+    const optionsArea = document.querySelector('.options-area');
+    optionsArea.innerHTML = '';
+    
+    const downloadContainer = document.createElement('div');
+    downloadContainer.className = 'download-area';
+    
+    // Add download icon
+    const downloadIcon = document.createElement('i');
+    downloadIcon.className = 'fas fa-download download-icon';
+    downloadContainer.appendChild(downloadIcon);
+    
+    // Add main text
+    const titleText = document.createElement('h3');
+    titleText.textContent = 'Your CSV file has been cleaned';
+    downloadContainer.appendChild(titleText);
+    
+    // Add download button
+    const downloadButton = document.createElement('button');
+    downloadButton.textContent = 'Download File';
+    downloadButton.className = 'download-button';
+    downloadButton.onclick = handleDownload;
+    downloadContainer.appendChild(downloadButton);
+    
+    // Add info text with file-support-text styling
+    const infoText = document.createElement('h4');
+    infoText.className = 'file-support-text';
+    infoText.textContent = 'Please note that after your cleaned file has been downloaded, you will be returned to the main page and your cleaned file has been deleted from our system. Thank you';
+    downloadContainer.appendChild(infoText);
+    
+    optionsArea.appendChild(downloadContainer);
+}
+
+function handleDownload() {
+    fetch('/download-file', {
+        method: 'GET'
+    })
+    .then(res => res.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cleaned_data.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        // Reset the page after download
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    })
+    .catch(err => {
+        alert('Error downloading file');
+    });
+}
+
+function checkAllProcessingComplete() {
+    const nameColumns = JSON.parse(sessionStorage.getItem('remainingNameColumns') || '[]');
+    const dateColumns = JSON.parse(sessionStorage.getItem('remainingDateColumns') || '[]');
+    const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
+    const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+
+    // If all arrays are empty, all processing is complete
+    if (nameColumns.length === 0 && 
+        dateColumns.length === 0 && 
+        categoricalColumns.length === 0 && 
+        numericalColumns.length === 0) {
+        showDownloadPage();
+        return true;
+    }
+    return false;
 }

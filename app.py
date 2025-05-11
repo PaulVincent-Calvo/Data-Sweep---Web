@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, send_file, after_this_request, make_response
 from werkzeug.utils import secure_filename
 import os
 import pandas as pd
@@ -138,27 +138,32 @@ def submit_classifications():
 @app.route('/check-empty-fields', methods=['POST'])
 def check_empty_fields():
     try:
-        if 'current_file' not in session:
-            return jsonify({'error': 'No file uploaded'}), 400
-
         data = request.get_json()
         columns = data.get('columns', [])
-        classification_type = data.get('classificationType', '')
+        classificationType = data.get('classificationType', '')
         
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
-        if not os.path.exists(filepath):
-            return jsonify({'error': 'File not found'}), 400
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file uploaded'}), 400
             
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
         df = pd.read_csv(filepath)
         
-        # Check specified columns for empty fields
-        columns_with_empty = [col for col in columns if df[col].isna().any()]
+        # For categorical data, also treat '<NA>' strings as empty values
+        if classificationType == 'Categorical':
+            columnsWithEmpty = []
+            for column in columns:
+                # Check for both NaN and '<NA>' values
+                is_empty = df[column].isna() | (df[column].astype(str) == '<NA>')
+                if is_empty.any():
+                    columnsWithEmpty.append(column)
+        else:
+            # For other types, just check for NaN
+            columnsWithEmpty = [col for col in columns if df[col].isna().any()]
         
         return jsonify({
             'success': True,
-            'hasEmptyFields': len(columns_with_empty) > 0,
-            'columnsWithEmpty': columns_with_empty,
-            'classificationType': classification_type
+            'hasEmptyFields': len(columnsWithEmpty) > 0,
+            'columnsWithEmpty': columnsWithEmpty
         })
         
     except Exception as e:
@@ -481,32 +486,35 @@ def handle_empty_categorical_fields():
         
         # Process each column according to the empty handling choice
         for column, handling in selections.items():
-            print(f"Processing {column} with {handling}")  # Debug print
+            # Create mask for both NaN and '<NA>' values
+            empty_mask = df[column].isna() | (df[column].astype(str) == '<NA>')
             
             if handling == 'delete-empty-rows':
-                df = df.dropna(subset=[column])
+                df = df.loc[~empty_mask]
             
             elif handling in ['fill-mode', 'fill-mean']:
+                # Get only valid values (not NaN or '<NA>')
+                valid_values = df.loc[~empty_mask, column]
+                
                 # Get unique values and create rank mapping
-                unique_values = sorted(df[column].dropna().unique())
+                unique_values = sorted(valid_values.unique())
                 value_ranks = {val: idx + 1 for idx, val in enumerate(unique_values)}
                 rank_values = {idx + 1: val for idx, val in enumerate(unique_values)}
                 
-                # Convert to numeric ranks
-                numeric_series = df[column].map(value_ranks)
-                
                 if handling == 'fill-mode':
-                    # Get most common value
-                    mode_value = df[column].mode()[0]
-                    df[column].fillna(mode_value, inplace=True)
+                    # Get most common value excluding NaN and '<NA>'
+                    mode_value = valid_values.mode()[0]
+                    df.loc[empty_mask, column] = mode_value
                 else:  # fill-mean
+                    # Convert to numeric ranks
+                    numeric_series = valid_values.map(value_ranks)
                     # Calculate mean of ranks
                     mean_rank = numeric_series.mean()
                     # Round to nearest rank
                     nearest_rank = round(mean_rank)
                     # Get corresponding value
-                    fill_value = rank_values.get(nearest_rank, rank_values[1])  # Default to first value if out of range
-                    df[column].fillna(fill_value, inplace=True)
+                    fill_value = rank_values.get(nearest_rank, rank_values[1])
+                    df.loc[empty_mask, column] = fill_value
 
         # Save the modified DataFrame
         df.to_csv(filepath, index=False)
@@ -516,12 +524,11 @@ def handle_empty_categorical_fields():
         
         return jsonify({
             'success': True,
-            'table': table_html,
-            'message': 'Empty categorical fields handled successfully'
+            'table': table_html
         })
         
     except Exception as e:
-        print(f"Error: {str(e)}")  # Debug print
+        print(f"Error: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -655,6 +662,197 @@ def apply_standardization():
             'success': False,
             'error': str(e)
         }), 400
+
+@app.route('/apply-numerical-rounding', methods=['POST'])
+def apply_numerical_rounding():
+    try:
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        data = request.get_json()
+        selections = data.get('selections', {})
+        
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'File not found'}), 400
+            
+        df = pd.read_csv(filepath)
+        
+        # Store rounding precision in DataFrame attributes
+        if 'rounding_precision' not in df.attrs:
+            df.attrs['rounding_precision'] = {}
+        
+        # Process each numerical column
+        for column, precision in selections.items():
+            try:
+                # First, clean the numbers (remove non-numeric chars except decimal point and negative sign)
+                def clean_number(value):
+                    if pd.isna(value):
+                        return value
+                    # Convert to string first
+                    str_val = str(value)
+                    # Keep only digits, decimal point, and negative sign
+                    cleaned = ''.join(c for c in str_val if c.isdigit() or c in '.-')
+                    # Handle multiple decimal points or negative signs
+                    if cleaned.count('.') > 1:
+                        # Keep only the first decimal point
+                        parts = cleaned.split('.')
+                        cleaned = parts[0] + '.' + ''.join(parts[1:])
+                    if cleaned.count('-') > 1:
+                        # Keep only the first negative sign
+                        cleaned = '-' + cleaned.replace('-', '')
+                    return cleaned if cleaned else None
+
+                # Clean and convert to numeric
+                df[column] = df[column].apply(clean_number).astype(float)
+                
+                # Store the precision for this column
+                df.attrs['rounding_precision'][column] = precision
+
+                # Apply rounding based on selection
+                if precision != 'keep':
+                    rounding_map = {
+                        'whole': 0,
+                        'tenths': 1,
+                        'hundredths': 2,
+                        'thousandths': 3,
+                        'ten-thousandths': 4
+                    }
+                    if precision in rounding_map:
+                        df[column] = df[column].round(rounding_map[precision])
+
+            except Exception as e:
+                print(f"Error processing column {column}: {str(e)}")
+                continue
+
+        # Save the modified DataFrame with attributes
+        df.to_csv(filepath, index=False)
+        
+        # Convert updated DataFrame to HTML table
+        table_html = df.to_html(classes='table table-striped', index=False)
+        
+        return jsonify({
+            'success': True,
+            'table': table_html
+        })
+        
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+@app.route('/handle-empty-numerical-fields', methods=['POST'])
+def handle_empty_numerical_fields():
+    try:
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        data = request.get_json()
+        selections = data.get('selections', {})
+        
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'File not found'}), 400
+            
+        df = pd.read_csv(filepath)
+        
+        # Get the previously applied rounding precision for each column
+        rounding_map = {
+            'whole': 0,
+            'tenths': 1,
+            'hundredths': 2,
+            'thousandths': 3,
+            'ten-thousandths': 4
+        }
+        
+        # Process each numerical column
+        for column, handling in selections.items():
+            # Convert to numeric, handling any non-numeric values as NaN
+            df[column] = pd.to_numeric(df[column], errors='coerce')
+            
+            # Get the column's current rounding precision from the DataFrame's metadata
+            # If not found, default to original precision
+            precision = None
+            if 'rounding_precision' in df.attrs:
+                precision = df.attrs['rounding_precision'].get(column)
+            
+            if handling == 'delete-empty-rows':
+                df = df.dropna(subset=[column])
+            
+            elif handling == 'fill-mean':
+                mean_value = df[column].mean()
+                if precision is not None and precision != 'keep':
+                    mean_value = round(mean_value, rounding_map.get(precision, 2))
+                df[column].fillna(mean_value, inplace=True)
+            
+            elif handling == 'fill-median':
+                median_value = df[column].median()
+                if precision is not None and precision != 'keep':
+                    median_value = round(median_value, rounding_map.get(precision, 2))
+                df[column].fillna(median_value, inplace=True)
+            
+            elif handling == 'fill-mode':
+                mode_value = df[column].mode()[0]
+                if precision is not None and precision != 'keep':
+                    mode_value = round(mode_value, rounding_map.get(precision, 2))
+                df[column].fillna(mode_value, inplace=True)
+
+        # Save the modified DataFrame
+        df.to_csv(filepath, index=False)
+        
+        # Convert updated DataFrame to HTML table
+        table_html = df.to_html(classes='table table-striped', index=False)
+        
+        return jsonify({
+            'success': True,
+            'table': table_html
+        })
+        
+    except Exception as e:
+        print(f"Error handling empty numerical fields: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+@app.route('/download-file', methods=['GET'])
+def download_file():
+    try:
+        if 'current_file' not in session:
+            return jsonify({'error': 'No file to download'}), 400
+            
+        timestamped_filename = session['current_file']
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], timestamped_filename)
+        
+        if not os.path.exists(filepath):
+            return jsonify({'error': 'File not found'}), 400
+
+        # Read the file content first
+        with open(filepath, 'rb') as f:
+            file_content = f.read()
+
+        # Delete the file immediately
+        try:
+            os.remove(filepath)
+            print(f"File deleted successfully: {filepath}")
+        except Exception as e:
+            print(f"Error deleting file: {str(e)}")
+
+        # Clear the session
+        session.pop('current_file', None)
+
+        # Create response with file content
+        response = make_response(file_content)
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = 'attachment; filename=cleaned_data.csv'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Download error: {str(e)}")
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)
