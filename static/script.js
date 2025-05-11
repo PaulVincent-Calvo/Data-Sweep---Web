@@ -10,6 +10,26 @@ blurOverlay.className = 'blur-overlay';
 document.body.appendChild(blurOverlay);
 blurOverlay.style.display = 'none';
 
+function showErrorPopup(message) {
+    const popup = document.getElementById('error-popup');
+    const errorMessage = document.getElementById('error-message');
+    const closeBtn = popup.querySelector('.popup-close');
+    
+    errorMessage.textContent = message;
+    popup.style.display = 'block';
+
+    closeBtn.onclick = function() {
+        popup.style.display = 'none';
+    }
+
+    // Close on outside click
+    window.onclick = function(event) {
+        if (event.target == popup) {
+            popup.style.display = 'none';
+        }
+    }
+}
+
 // Prevent double triggering of file input dialog
 uploadButton.addEventListener('click', (e) => {
   e.stopPropagation(); // Stop the event from propagating to the dropArea
@@ -59,7 +79,7 @@ function uploadFile(file) {
       mainContent.classList.remove('blurred');
 
       if (data.error) {
-        alert(data.error);
+        console.log(data.error);
       } else if (data.success && data.columns) {
         // Hide the drop area
         dropArea.style.display = 'none';
@@ -99,7 +119,7 @@ function uploadFile(file) {
           checkbox.type = 'checkbox';
           checkbox.id = `col-${column}`;
           checkbox.value = column;
-          checkbox.checked = true; 
+          checkbox.checked = false; 
 
           const label = document.createElement('label');
           label.htmlFor = `col-${column}`;
@@ -142,7 +162,7 @@ function uploadFile(file) {
                 .map(cb => cb.value);
 
             if (columnsToDelete.length === 0) {
-                alert('Please select columns to delete');
+                console.log('Please select columns to delete');
                 return;
             }
 
@@ -181,15 +201,16 @@ function uploadFile(file) {
                     // Show classification interface
                     showClassificationInterface();
                 } else {
-                    alert('Error deleting columns');
+                    if (data.error.includes('Cannot delete all columns')) {
+                        showErrorPopup('You must keep at least one column in the table');
+                    } else if (data.error.includes('No data rows remaining')) {
+                        showErrorPopup('Cannot delete all rows from the table');
+                    } else {
+                        showErrorPopup('Error deleting columns');
+                    }
                 }
             })
-            .catch(err => {
-                console.error(err);
-                alert('Error deleting columns');
-            })
             .finally(() => {
-                // Hide loading spinner
                 loadingSpinner.hidden = true;
                 blurOverlay.style.display = 'none';
                 mainContent.classList.remove('blurred');
@@ -207,7 +228,6 @@ function uploadFile(file) {
       blurOverlay.style.display = 'none';
       mainContent.classList.remove('blurred');
       alert('Error uploading file');
-      console.error(err);
     });
 }
 
@@ -307,8 +327,7 @@ function showClassificationInterface() {
         optionsArea.appendChild(classificationContainer);
     })
     .catch(err => {
-        console.error('Classification interface error:', err);
-        alert(`Error loading classification interface: ${err.message}`);
+        console.log(`Error loading classification interface: ${err.message}`);
     });
 }
 
@@ -335,7 +354,7 @@ function submitClassifications() {
     });
 
     if (!isValid) {
-        alert('Please classify all columns before submitting');
+        console.log('Please classify all columns before submitting');
         return;
     }
 
@@ -344,7 +363,6 @@ function submitClassifications() {
     blurOverlay.style.display = 'block';
     mainContent.classList.add('blurred');
 
-    // Send classifications to server
     fetch('/submit-classifications', {
         method: 'POST',
         headers: {
@@ -360,186 +378,57 @@ function submitClassifications() {
 
             // Filter columns by classification type
             const nameColumns = Object.entries(classifications)
-                .filter(([_, type]) => type === 'Name')
+                .filter(([_, type]) => type === 'Non-categorical')
                 .map(([column]) => column);
 
+            const dateColumns = Object.entries(classifications)
+                .filter(([_, type]) => type === 'Date')
+                .map(([column]) => column);
+
+            const categoricalColumns = Object.entries(classifications)
+                .filter(([_, type]) => type === 'Categorical')
+                .map(([column]) => column);
+
+            const numericalColumns = Object.entries(classifications)
+                .filter(([_, type]) => type === 'Numerical')
+                .map(([column]) => column);
+
+            // Store all columns for later use
+            sessionStorage.setItem('remainingNameColumns', JSON.stringify(nameColumns));
+            sessionStorage.setItem('remainingDateColumns', JSON.stringify(dateColumns));
+            sessionStorage.setItem('remainingCategoricalColumns', JSON.stringify(categoricalColumns));
+            sessionStorage.setItem('remainingNumericalColumns', JSON.stringify(numericalColumns));
+
+            // Start with non-categorical empty fields
             if (nameColumns.length > 0) {
-                // Check empty fields only for name columns
-                checkEmptyFields(nameColumns, 'Name')
+                checkEmptyFields(nameColumns, 'Non-categorical')
                     .then(data => {
-                        const optionsArea = document.querySelector('.options-area');
-                        optionsArea.innerHTML = '';
-
-                        // Create format options div
-                        const nameFormatDiv = document.createElement('div');
-                        nameFormatDiv.className = 'name-format-options';
-
-                        const formatTitle = document.createElement('h3');
-                        formatTitle.textContent = 'Format Name Columns';
-                        nameFormatDiv.appendChild(formatTitle);
-
-                        // Add format options for each name column
-                        nameColumns.forEach(column => {
-                            const columnDiv = document.createElement('div');
-                            columnDiv.className = 'name-column-item';
-
-                            const label = document.createElement('span');
-                            label.className = 'name-column-label';
-                            label.textContent = column;
-
-                            const select = document.createElement('select');
-                            select.className = 'format-select';
-                            select.id = `format-${column}`;
-
-                            const options = ['UPPERCASE', 'lowercase', 'Title Case', 'Sentence case'];
-                            options.forEach(opt => {
-                                const option = document.createElement('option');
-                                option.value = opt.toLowerCase().replace(' ', '-');
-                                option.textContent = opt;
-                                select.appendChild(option);
-                            });
-
-                            columnDiv.appendChild(label);
-                            columnDiv.appendChild(select);
-                            nameFormatDiv.appendChild(columnDiv);
-                        });
-
-                        // Add format submit button container
-                        const formatButtonContainer = document.createElement('div');
-                        formatButtonContainer.className = 'format-button-container';
-                        const formatSubmitBtn = document.createElement('button');
-                        formatSubmitBtn.className = 'format-submit-button';
-                        formatSubmitBtn.textContent = 'Apply Format';
-                        formatButtonContainer.appendChild(formatSubmitBtn);
-
-
-                        // If there are empty fields, create empty fields options
                         if (data.hasEmptyFields) {
-                            // Create empty fields options div FIRST
-                            nameFormatDiv.style.display = 'none';
-                            formatButtonContainer.style.display = 'none';
-                            const emptyOptionsContainer = document.createElement('div');
-                            emptyOptionsContainer.className = 'empty-container';
-                            const emptyOptionsDiv = document.createElement('div');
-                            emptyOptionsDiv.className = 'name-empty-options';
-                            optionsArea.appendChild(emptyOptionsDiv);
-                            const emptyTitle = document.createElement('h3');
-                            emptyTitle.textContent = 'Handle Empty Fields';
-                            emptyOptionsDiv.appendChild(emptyTitle);
-
-                            // Add empty field options for columns with empty fields
-                            data.columnsWithEmpty.forEach(column => {
-                                const columnDiv = document.createElement('div');
-                                columnDiv.className = 'name-column-item';
-
-                                const label = document.createElement('span');
-                                label.className = 'name-column-label';
-                                label.textContent = column;
-
-                                const select = document.createElement('select');
-                                select.className = 'format-select';
-                                select.id = `empty-${column}`;
-
-                                const options = ['Delete empty rows', 'Fill with "None"', 'Fill with "Unknown"', 'Fill with "N/A"'];
-                                options.forEach(opt => {
-                                    const option = document.createElement('option');
-                                    option.value = opt.toLowerCase().replace(/ /g, '-');
-                                    option.textContent = opt;
-                                    select.appendChild(option);
-                                });
-
-                                columnDiv.appendChild(label);
-                                columnDiv.appendChild(select);
-                                emptyOptionsDiv.appendChild(columnDiv);
-                            });
-
-                            // Add empty fields submit button container
-                            const emptyButtonContainer = document.createElement('div');
-                            emptyButtonContainer.className = 'empty-button-container';
-                            const emptySubmitBtn = document.createElement('button');
-                            emptySubmitBtn.className = 'empty-submit-button';
-                            emptySubmitBtn.textContent = 'Apply Empty Field Handling';
-                            emptyButtonContainer.appendChild(emptySubmitBtn);
-                            optionsArea.appendChild(emptyButtonContainer);
-
-                            // Hide format options initially
-                            nameFormatDiv.style.display = 'none';
-
-                            // Add event listener for empty fields submit
-                            emptySubmitBtn.addEventListener('click', () => {
-                                // Get all empty field handling selections for name fields
-                                const emptySelects = document.querySelectorAll('.name-empty-options select');
-                                const nameEmptyHandling = {};
-                                
-                                // Create object with name column names and their empty field handling choice
-                                emptySelects.forEach(select => {
-                                    const columnName = select.id.replace('empty-', '');
-                                    nameEmptyHandling[columnName] = select.value;
-                                });
-
-                                // Show loading spinner
-                                loadingSpinner.hidden = false;
-                                blurOverlay.style.display = 'block';
-                                mainContent.classList.add('blurred');
-
-                                // Send empty field handling choices to server
-                                fetch('/handle-empty-name-fields', {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ nameEmptyHandling })
-                                })
-                                .then(res => res.json())
-                                .then(data => {
-                                    if (data.success) {
-                                        // Update the table preview with the modified data
-                                        csvArea.innerHTML = data.table;
-                                        const table = csvArea.querySelector('table');
-                                        if (table) {
-                                            table.classList.add('table', 'table-striped', 'table-bordered');
-                                        }
-
-                                        // Show the name format options after handling empty fields
-                                        nameFormatDiv.style.display = 'block';
-                                        emptyOptionsDiv.style.display = 'none';
-                                        emptyButtonContainer.style.display = 'none';
-                                    } else {
-                                        throw new Error(data.error || 'Failed to handle empty name fields');
-                                    }
-                                })
-                                .catch(err => {
-                                    console.error('Error handling empty name fields:', err);
-                                    alert(`Error: ${err.message}`);
-                                })
-                                .finally(() => {
-                                    // Hide loading spinner
-                                    loadingSpinner.hidden = true;
-                                    blurOverlay.style.display = 'none';
-                                    mainContent.classList.remove('blurred');
-                                });
-                            });
-
+                            handleNonCategoricalData(nameColumns, true);  // true indicates starting with empty fields
                         } else {
-                            nameFormatDiv.style.display = 'block';
-                            formatButtonContainer.style.display = 'block';
+                            // If no empty fields, go straight to formatting
+                            handleNonCategoricalData(nameColumns, false);
                         }
-
-                        // Add format div (will be hidden if there are empty fields)
-                        optionsArea.appendChild(nameFormatDiv);
-                        optionsArea.appendChild(formatButtonContainer);
-                        // Add event listener for format submit
-                        formatSubmitBtn.addEventListener('click', () => {
-                            nameFormatDiv.style.display = 'none';
-                        });
                     });
+            } else if (dateColumns.length > 0) {
+                checkEmptyFields(dateColumns, 'Date')
+                    .then(data => {
+                        if (data.hasEmptyFields) {
+                            handleDateData(dateColumns, true);
+                        } else {
+                            handleDateData(dateColumns, false);
+                        }
+                    });
+            } else if (categoricalColumns.length > 0) {
+                handleCategoricalData(categoricalColumns);
+            } else if (numericalColumns.length > 0) {
+                handleNumericalData(numericalColumns);
             }
         } else {
             throw new Error(data.error || 'Failed to submit classifications');
         }
     })
     .catch(err => {
-        console.error('Error submitting classifications:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
@@ -561,4 +450,974 @@ function checkEmptyFields(columns, classificationType) {
         })
     })
     .then(res => res.json());
+}
+
+function createOptionsContainer(title, columns, options, handleSubmit, submitButtonText) {
+    const container = document.createElement('div');
+    container.className = 'options-container';
+    
+    const optionsDiv = document.createElement('div');
+    optionsDiv.className = 'format-options';
+
+    const formatTitle = document.createElement('h3');
+    formatTitle.textContent = title;
+    optionsDiv.appendChild(formatTitle);
+
+    const optionsList = document.createElement('div');
+    optionsList.className = 'options-list';
+
+    columns.forEach(column => {
+        const columnDiv = document.createElement('div');
+        columnDiv.className = 'column-item';
+
+        const columnNameDiv = document.createElement('div');
+        columnNameDiv.className = 'column-name';
+
+        const columnName = document.createElement('p');
+        columnName.textContent = column;
+        columnNameDiv.appendChild(columnName);
+        columnDiv.appendChild(columnNameDiv);
+
+        const select = document.createElement('select');
+        select.className = 'format-select';
+        // Create a safe ID by replacing spaces and special characters
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        select.id = `format-${safeColumnId}`;
+
+        options.forEach(opt => {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            select.appendChild(option);
+        });
+
+        columnDiv.appendChild(select);
+        optionsList.appendChild(columnDiv);
+    });
+
+    optionsDiv.appendChild(optionsList);
+    container.appendChild(optionsDiv);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'submit-button-container'; // Change from 'button-container' to 'submit-button-container'
+    
+    const submitButton = document.createElement('button');
+    submitButton.textContent = submitButtonText;
+    submitButton.className = 'submit-button';
+    submitButton.addEventListener('click', handleSubmit);
+
+    buttonContainer.appendChild(submitButton);
+    container.appendChild(buttonContainer);
+
+    return container;
+}
+
+// Update handling of non-categorical data
+function handleNonCategoricalData(columns, classifications) {
+    checkEmptyFields(columns, 'Non-categorical')
+        .then(data => {
+            const optionsArea = document.querySelector('.options-area');
+            optionsArea.innerHTML = '';
+
+            const optionsWrapper = document.createElement('div');
+            optionsWrapper.className = 'options-wrapper';
+
+            const formatContainer = createFormatContainer(columns, true);
+
+            if (data.hasEmptyFields) {
+                const emptyFieldsOptions = [
+                    { value: 'delete-empty-rows', label: 'Delete empty rows' },
+                    { value: 'fill-none', label: 'Fill with "None"' },
+                    { value: 'fill-unknown', label: 'Fill with "Unknown"' },
+                    { value: 'fill-na', label: 'Fill with "N/A"' }
+                ];
+
+                const emptyContainer = createOptionsContainer(
+                    'Handle Empty Non-Categorical Rows',
+                    data.columnsWithEmpty,
+                    emptyFieldsOptions,
+                    () => handleEmptyFieldSubmit(data.columnsWithEmpty, 'Non-categorical', formatContainer),
+                    'Apply Empty Field Handling'
+                );
+                optionsWrapper.appendChild(emptyContainer);
+                optionsWrapper.appendChild(formatContainer);
+            } else {
+                formatContainer.style.display = 'block';
+                optionsWrapper.appendChild(formatContainer);
+            }
+
+            optionsArea.appendChild(optionsWrapper);
+        });
+}
+
+// Update handling of date data
+function handleDateData(columns, classifications) {
+    checkEmptyFields(columns, 'Date')
+        .then(data => {
+            const optionsArea = document.querySelector('.options-area');
+            optionsArea.innerHTML = '';
+
+            const optionsWrapper = document.createElement('div');
+            optionsWrapper.className = 'options-wrapper';
+
+            // Create format container first
+            const formatContainer = createDateFormatContainer(columns, true);
+
+            if (data.hasEmptyFields) {
+                const emptyFieldsOptions = [
+                    { value: 'delete-empty-rows', label: 'Delete empty rows' },
+                    { value: 'fill-current-date', label: 'Fill with current date' },
+                    { value: 'fill-na', label: 'Fill with "N/A"' }
+                ];
+
+                const emptyContainer = createOptionsContainer(
+                    'Handle Empty Date Rows',
+                    data.columnsWithEmpty,
+                    emptyFieldsOptions,
+                    () => handleEmptyFieldSubmit(data.columnsWithEmpty, 'Date', formatContainer),
+                    'Apply Empty Field Handling'
+                );
+                optionsWrapper.appendChild(emptyContainer);
+                optionsWrapper.appendChild(formatContainer);
+            } else {
+                formatContainer.style.display = 'block';
+                optionsWrapper.appendChild(formatContainer);
+            }
+
+            optionsArea.appendChild(optionsWrapper);
+        });
+}
+
+// Update the handleEmptyFieldSubmit function
+function handleEmptyFieldSubmit(columns, type, formatContainer) {
+    const selections = {};
+    columns.forEach(column => {
+        const select = document.querySelector(`#format-${column}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    // Show loading spinner
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    // Remove categorical endpoint
+    const endpoint = type === 'Date' ? '/handle-empty-date-fields' : '/handle-empty-fields';
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Update table
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            
+            // Check if all data was deleted
+            if (!table || !table.rows || table.rows.length <= 1) { // Only header row or no rows
+                // Show warning and reload page
+                console.log('All data has been deleted. Returning to upload page...');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+                return;
+            }
+
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            // Remove the empty fields container entirely instead of hiding it
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            const containers = optionsWrapper.querySelectorAll('.options-container');
+            if (containers.length > 0) {
+                containers[0].remove();
+            }
+
+            // Show the format container
+            if (formatContainer) {
+                formatContainer.style.display = 'flex';
+            }
+        } else {
+            throw new Error(data.error || 'Failed to handle empty fields');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function handleFormatSubmit(columns, type) {
+    const selections = {};
+    columns.forEach(column => {
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    let endpoint;
+    if (type === 'Date') {
+        endpoint = '/apply-date-formats';
+    } else if (type === 'Categorical') {
+        endpoint = '/apply-categorical-formats';
+    } else {
+        endpoint = '/apply-formats';
+    }
+
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            
+            // Check if all data was deleted
+            if (!table || !table.rows || table.rows.length <= 1) {
+                console.log('No data remaining after processing. Returning to upload page...');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+                return;
+            }
+
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            // Remove the options wrapper
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Remove the processed columns from storage
+            if (type === 'Non-categorical') {
+                sessionStorage.setItem('remainingNameColumns', '[]');
+            } else if (type === 'Date') {
+                sessionStorage.setItem('remainingDateColumns', '[]');
+            } else if (type === 'Categorical') {
+                sessionStorage.setItem('remainingCategoricalColumns', '[]');
+            }
+
+            // Check if all processing is complete
+            if (!checkAllProcessingComplete()) {
+                // Continue with the existing chain logic
+                const dateColumns = JSON.parse(sessionStorage.getItem('remainingDateColumns') || '[]');
+                if (type === 'Non-categorical' && dateColumns.length > 0) {
+                    checkEmptyFields(dateColumns, 'Date')
+                        .then(data => {
+                            if (data.hasEmptyFields) {
+                                handleDateData(dateColumns, true);
+                            } else {
+                                handleDateData(dateColumns, false);
+                            }
+                        });
+                } else if (type === 'Date') {
+                    const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
+                    if (categoricalColumns.length > 0) {
+                        handleCategoricalData(categoricalColumns);
+                    } else {
+                        const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+                        if (numericalColumns.length > 0) {
+                            handleNumericalData(numericalColumns);
+                        }
+                    }
+                } else if (type === 'Categorical') {
+                    fetch('/get-unique-values', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ columns })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            handleCategoricalStandardization(columns);
+                        }
+                    });
+                }
+            }
+
+            console.log(`${type} formatting applied successfully!`);
+        } else {
+            throw new Error(data.error || `Failed to apply ${type.toLowerCase()} formats`);
+        }
+    })
+    .catch(err => {
+        console.log(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function createFormatContainer(columns, hidden) {
+    const formatOptions = [
+        { value: 'uppercase', label: 'UPPERCASE' },
+        { value: 'lowercase', label: 'lowercase' },
+        { value: 'title-case', label: 'Title Case' },
+        { value: 'sentence-case', label: 'Sentence case' }
+    ];
+
+    const container = createOptionsContainer(
+        'Format Non-categorical Columns',
+        columns,
+        formatOptions,
+        () => handleFormatSubmit(columns, 'Non-categorical'),
+        'Apply Format'
+    );
+
+    if (hidden) {
+        container.style.display = 'none';
+    }
+
+    return container;
+}
+
+function createDateFormatContainer(columns, hidden) {
+    const dateFormatOptions = [
+        { value: '', label: 'Select date format' }, // Add default option
+        { value: 'mm/dd/yyyy', label: 'MM/DD/YYYY' },
+        { value: 'dd/mm/yyyy', label: 'DD/MM/YYYY' },
+        { value: 'yyyy/mm/dd', label: 'YYYY/MM/DD' }
+    ];
+
+    const container = createOptionsContainer(
+        'Format Date Columns',
+        columns,
+        dateFormatOptions,
+        () => handleFormatSubmit(columns, 'Date'),
+        'Apply Date Format'
+    );
+
+    if (hidden) {
+        container.style.display = 'none';
+    }
+
+    return container;
+}
+
+function handleCategoricalData(columns, classifications) {
+    const optionsArea = document.querySelector('.options-area');
+    optionsArea.innerHTML = '';
+
+    const optionsWrapper = document.createElement('div');
+    optionsWrapper.className = 'options-wrapper';
+
+    // Create format container and show it immediately
+    const formatContainer = createCategoricalFormatContainer(columns, false);
+    optionsWrapper.appendChild(formatContainer);
+    optionsArea.appendChild(optionsWrapper);
+}
+
+function createCategoricalFormatContainer(columns, hidden) {
+    const formatOptions = [
+        { value: 'uppercase', label: 'UPPERCASE' },
+        { value: 'lowercase', label: 'lowercase' },
+        { value: 'title-case', label: 'Title Case' },
+        { value: 'sentence-case', label: 'Sentence case' }
+    ];
+
+    const container = createOptionsContainer(
+        'Format Categorical Values',
+        columns,
+        formatOptions,
+        () => handleFormatSubmit(columns, 'Categorical'),
+        'Apply Format'
+    );
+
+    if (hidden) {
+        container.style.display = 'none';
+    }
+
+    return container;
+}
+
+function handleCategoricalStandardization(columns) {
+    fetch('/get-unique-values', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ columns })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const optionsArea = document.querySelector('.options-area');
+            optionsArea.innerHTML = '';
+
+            const optionsWrapper = document.createElement('div');
+            optionsWrapper.className = 'options-wrapper';
+
+            const container = createStandardizationContainer(columns, data.uniqueValues);
+            optionsWrapper.appendChild(container);
+            optionsArea.appendChild(optionsWrapper);
+        }
+    });
+}
+
+function createStandardizationContainer(columns, uniqueValues) {
+    const container = document.createElement('div');
+    container.className = 'options-container';
+
+    const optionsDiv = document.createElement('div');
+    optionsDiv.className = 'format-options';
+
+    const title = document.createElement('h3');
+    title.textContent = 'Standardize Categorical Values';
+    optionsDiv.appendChild(title);
+
+    const columnsList = document.createElement('div');
+    columnsList.className = 'options-list';
+
+    columns.forEach(column => {
+        const columnSection = document.createElement('div');
+        columnSection.className = 'column-section';
+
+        const columnTitle = document.createElement('h4');
+        columnTitle.textContent = column;
+        columnSection.appendChild(columnTitle);
+
+        const uniqueList = document.createElement('div');
+        uniqueList.className = 'unique-values-list';
+
+        uniqueValues[column].forEach(value => {
+            const valueDiv = document.createElement('div');
+            valueDiv.className = 'value-item';
+
+            const valueText = document.createElement('p');
+            valueText.textContent = value;
+            valueDiv.appendChild(valueText);
+
+            const select = document.createElement('select');
+            select.className = 'standardize-select';
+            select.id = `standardize-${column}-${value}`;
+
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Select standard value';
+            select.appendChild(defaultOption);
+
+            // Add all unique values as options
+            uniqueValues[column].forEach(optionValue => {
+                const option = document.createElement('option');
+                option.value = optionValue;
+                option.textContent = optionValue;
+                select.appendChild(option);
+            });
+
+            valueDiv.appendChild(select);
+            uniqueList.appendChild(valueDiv);
+        });
+
+        columnSection.appendChild(uniqueList);
+        columnsList.appendChild(columnSection);
+    });
+
+    optionsDiv.appendChild(columnsList);
+    container.appendChild(optionsDiv);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'submit-button-container';
+
+    const submitButton = document.createElement('button');
+    submitButton.textContent = 'Apply Standardization';
+    submitButton.className = 'submit-button';
+    submitButton.onclick = () => handleStandardizationSubmit(columns, uniqueValues);
+
+    buttonContainer.appendChild(submitButton);
+    container.appendChild(buttonContainer);
+
+    return container;
+}
+
+function handleStandardizationSubmit(columns, uniqueValues) {
+    const standardizations = {};
+
+    columns.forEach(column => {
+        standardizations[column] = {};
+        uniqueValues[column].forEach(value => {
+            const select = document.querySelector(`#standardize-${column}-${value}`);
+            if (select && select.value) {
+                standardizations[column][value] = select.value;
+            }
+        });
+    });
+
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    fetch('/apply-standardization', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ standardizations })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.text().then(text => {
+                // Try to parse as JSON first
+                try {
+                    const json = JSON.parse(text);
+                    throw new Error(json.error || 'Server error');
+                } catch (e) {
+                    // If not JSON, it's probably HTML error page
+                    throw new Error('Server error occurred');
+                }
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Check for empty fields after standardization
+            checkEmptyFields(columns, 'Categorical')
+                .then(data => {
+                    if (data.hasEmptyFields) {
+                        handleCategoricalEmptyFields(columns);
+                    } else {
+                        // If no empty fields, move to numerical data
+                        const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+                        if (numericalColumns.length > 0) {
+                            handleNumericalData(numericalColumns);
+                        }
+                    }
+                });
+
+            console.log('Standardization applied successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to apply standardization');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function handleCategoricalEmptyFields(columns) {
+    checkEmptyFields(columns, 'Categorical')
+        .then(data => {
+            const optionsArea = document.querySelector('.options-area');
+            const newOptionsWrapper = document.createElement('div');
+            newOptionsWrapper.className = 'options-wrapper';
+
+            if (data.hasEmptyFields) {
+                const emptyFieldsOptions = [
+                    { value: 'delete-empty-rows', label: 'Delete empty rows' },
+                    { value: 'fill-mode', label: 'Fill with mode' },
+                    { value: 'fill-mean', label: 'Fill with mean' }
+                ];
+
+                const emptyContainer = createOptionsContainer(
+                    'Handle Empty Categorical Fields',
+                    data.columnsWithEmpty,
+                    emptyFieldsOptions,
+                    () => handleCategoricalEmptyFieldSubmit(data.columnsWithEmpty),
+                    'Apply Empty Field Handling'
+                );
+
+                newOptionsWrapper.appendChild(emptyContainer);
+                optionsArea.appendChild(newOptionsWrapper);
+            } else {
+                const completionMessage = document.createElement('div');
+                completionMessage.className = 'completion-message';
+                completionMessage.textContent = 'Categorical data processing complete!';
+                optionsArea.appendChild(completionMessage);
+            }
+        });
+}
+
+function handleCategoricalEmptyFieldSubmit(columns) {
+    const selections = {};
+    columns.forEach(column => {
+        // Fix: Use the correct ID format and handle special characters
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    // Show loading spinner
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    // Make the API call
+    fetch('/handle-empty-categorical-fields', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(err.error || 'Server error occurred');
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update table
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            // Remove the options container
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Instead of showing completion message, move to numerical data
+            const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+            if (numericalColumns.length > 0) {
+                handleNumericalData(numericalColumns);
+            }
+
+            console.log('Empty fields handled successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to handle empty fields');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function handleNumericalData(columns) {
+    const optionsArea = document.querySelector('.options-area');
+    optionsArea.innerHTML = '';
+
+    const optionsWrapper = document.createElement('div');
+    optionsWrapper.className = 'options-wrapper';
+
+    // Updated rounding options with new "Keep original" option
+    const roundingOptions = [
+        { value: '', label: 'Select rounding precision' }, // Default option
+        { value: 'keep', label: 'Keep original numbers' },
+        { value: 'whole', label: 'Round to nearest whole number' },
+        { value: 'tenths', label: 'Round to nearest tenth (0.1)' },
+        { value: 'hundredths', label: 'Round to nearest hundredth (0.01)' },
+        { value: 'thousandths', label: 'Round to nearest thousandth (0.001)' },
+        { value: 'ten-thousandths', label: 'Round to nearest ten-thousandth (0.0001)' }
+    ];
+
+    const roundingContainer = createOptionsContainer(
+        'Round Numerical Values',
+        columns,
+        roundingOptions,
+        () => handleRoundingSubmit(columns),
+        'Apply Rounding'
+    );
+
+    const selects = roundingContainer.querySelectorAll('.format-select');
+    selects.forEach(select => {
+        select.style.width = '300px';
+    });
+
+    optionsWrapper.appendChild(roundingContainer);
+    optionsArea.appendChild(optionsWrapper);
+}
+
+function handleRoundingSubmit(columns) {
+    const selections = {};
+    columns.forEach(column => {
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    if (Object.values(selections).some(val => !val)) {
+        console.log('Please select rounding precision for all columns');
+        return;
+    }
+
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    fetch('/apply-numerical-rounding', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(err.error || 'Server error occurred');
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Chain to empty fields handling
+            checkEmptyFields(columns, 'Numerical')
+                .then(data => {
+                    if (data.hasEmptyFields) {
+                        handleNumericalEmptyFields(columns);
+                    }
+                });
+
+            console.log('Numerical formatting applied successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to apply numerical formatting');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function handleNumericalEmptyFields(columns) {
+    checkEmptyFields(columns, 'Numerical')
+        .then(data => {
+            const optionsArea = document.querySelector('.options-area');
+            const newOptionsWrapper = document.createElement('div');
+            newOptionsWrapper.className = 'options-wrapper';
+
+            if (data.hasEmptyFields) {
+                const emptyFieldsOptions = [
+                    { value: 'delete-empty-rows', label: 'Delete empty rows' },
+                    { value: 'fill-mean', label: 'Fill with mean' },
+                    { value: 'fill-median', label: 'Fill with median' },
+                    { value: 'fill-mode', label: 'Fill with mode' }
+                ];
+
+                const emptyContainer = createOptionsContainer(
+                    'Handle Empty Numerical Fields',
+                    data.columnsWithEmpty,
+                    emptyFieldsOptions,
+                    () => handleNumericalEmptyFieldSubmit(data.columnsWithEmpty),
+                    'Apply Empty Field Handling'
+                );
+
+                newOptionsWrapper.appendChild(emptyContainer);
+                optionsArea.appendChild(newOptionsWrapper);
+            } else {
+                const completionMessage = document.createElement('div');
+                completionMessage.className = 'completion-message';
+                completionMessage.textContent = 'Numerical data processing complete!';
+                optionsArea.appendChild(completionMessage);
+            }
+        });
+}
+
+function handleNumericalEmptyFieldSubmit(columns) {
+    const selections = {};
+    columns.forEach(column => {
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    fetch('/handle-empty-numerical-fields', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(err.error || 'Server error occurred');
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update table
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            // Remove the options container
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Clear numerical columns from storage
+            sessionStorage.setItem('remainingNumericalColumns', '[]');
+
+            // Check if all processing is complete
+            checkAllProcessingComplete();
+
+            console.log('Empty fields handled successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to handle empty fields');
+        }
+    })
+    .catch(err => {
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+// Add new function for download page
+function showDownloadPage() {
+    const optionsArea = document.querySelector('.options-area');
+    optionsArea.innerHTML = '';
+    
+    const downloadContainer = document.createElement('div');
+    downloadContainer.className = 'download-area';
+    
+    // Add download icon
+    const downloadIcon = document.createElement('i');
+    downloadIcon.className = 'fas fa-download download-icon';
+    downloadContainer.appendChild(downloadIcon);
+    
+    // Add main text
+    const titleText = document.createElement('h3');
+    titleText.textContent = 'Your CSV file has been cleaned';
+    downloadContainer.appendChild(titleText);
+    
+    // Add download button
+    const downloadButton = document.createElement('button');
+    downloadButton.textContent = 'Download File';
+    downloadButton.className = 'download-button';
+    downloadButton.onclick = handleDownload;
+    downloadContainer.appendChild(downloadButton);
+    
+    // Add info text with file-support-text styling
+    const infoText = document.createElement('h4');
+    infoText.className = 'file-support-text';
+    infoText.textContent = 'Please note that after your cleaned file has been downloaded, you will be returned to the main page and your cleaned file has been deleted from our system. Thank you';
+    downloadContainer.appendChild(infoText);
+    
+    optionsArea.appendChild(downloadContainer);
+}
+
+function handleDownload() {
+    fetch('/download-file', {
+        method: 'GET'
+    })
+    .then(res => res.blob())
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'cleaned_data.csv';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        // Reset the page after download
+        setTimeout(() => {
+            location.reload();
+        }, 1000);
+    })
+    .catch(err => {
+        console.log('Error downloading file');
+    });
+}
+
+function checkAllProcessingComplete() {
+    const nameColumns = JSON.parse(sessionStorage.getItem('remainingNameColumns') || '[]');
+    const dateColumns = JSON.parse(sessionStorage.getItem('remainingDateColumns') || '[]');
+    const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
+    const numericalColumns = JSON.parse(sessionStorage.getItem('remainingNumericalColumns') || '[]');
+
+    // If all arrays are empty, all processing is complete
+    if (nameColumns.length === 0 && 
+        dateColumns.length === 0 && 
+        categoricalColumns.length === 0 && 
+        numericalColumns.length === 0) {
+        showDownloadPage();
+        return true;
+    }
+    return false;
 }
