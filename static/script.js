@@ -189,7 +189,6 @@ function uploadFile(file) {
                 alert('Error deleting columns');
             })
             .finally(() => {
-                // Hide loading spinner
                 loadingSpinner.hidden = true;
                 blurOverlay.style.display = 'none';
                 mainContent.classList.remove('blurred');
@@ -923,8 +922,11 @@ function handleStandardizationSubmit(columns, uniqueValues) {
 
             const optionsWrapper = document.querySelector('.options-wrapper');
             if (optionsWrapper) {
-                optionsWrapper.remove();  // Change to remove instead of hide
+                optionsWrapper.remove();
             }
+
+            // Add this line to handle empty fields after standardization
+            handleCategoricalEmptyFields(columns);
 
             alert('Standardization applied successfully!');
         } else {
@@ -933,6 +935,109 @@ function handleStandardizationSubmit(columns, uniqueValues) {
     })
     .catch(err => {
         console.error('Error applying standardization:', err);
+        alert(`Error: ${err.message}`);
+    })
+    .finally(() => {
+        loadingSpinner.hidden = true;
+        blurOverlay.style.display = 'none';
+        mainContent.classList.remove('blurred');
+    });
+}
+
+function handleCategoricalEmptyFields(columns) {
+    checkEmptyFields(columns, 'Categorical')
+        .then(data => {
+            const optionsArea = document.querySelector('.options-area');
+            const newOptionsWrapper = document.createElement('div');
+            newOptionsWrapper.className = 'options-wrapper';
+
+            if (data.hasEmptyFields) {
+                const emptyFieldsOptions = [
+                    { value: 'delete-empty-rows', label: 'Delete empty rows' },
+                    { value: 'fill-mode', label: 'Fill with mode (most common value)' },
+                    { value: 'fill-mean', label: 'Fill with mean (average rank)' }
+                ];
+
+                const emptyContainer = createOptionsContainer(
+                    'Handle Empty Categorical Fields',
+                    data.columnsWithEmpty,
+                    emptyFieldsOptions,
+                    () => handleCategoricalEmptyFieldSubmit(data.columnsWithEmpty),
+                    'Apply Empty Field Handling'
+                );
+
+                newOptionsWrapper.appendChild(emptyContainer);
+                optionsArea.appendChild(newOptionsWrapper);
+            } else {
+                const completionMessage = document.createElement('div');
+                completionMessage.className = 'completion-message';
+                completionMessage.textContent = 'Categorical data processing complete!';
+                optionsArea.appendChild(completionMessage);
+            }
+        });
+}
+
+function handleCategoricalEmptyFieldSubmit(columns) {
+    const selections = {};
+    columns.forEach(column => {
+        // Fix: Use the correct ID format and handle special characters
+        const safeColumnId = column.replace(/[^a-zA-Z0-9]/g, '_');
+        const select = document.querySelector(`#format-${safeColumnId}`);
+        if (select) {
+            selections[column] = select.value;
+        }
+    });
+
+    // Show loading spinner
+    loadingSpinner.hidden = false;
+    blurOverlay.style.display = 'block';
+    mainContent.classList.add('blurred');
+
+    // Make the API call
+    fetch('/handle-empty-categorical-fields', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ selections })
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => {
+                throw new Error(err.error || 'Server error occurred');
+            });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Update table
+            csvArea.innerHTML = data.table;
+            const table = csvArea.querySelector('table');
+            if (table) {
+                table.classList.add('table', 'table-striped', 'table-bordered');
+            }
+
+            // Remove the options container
+            const optionsWrapper = document.querySelector('.options-wrapper');
+            if (optionsWrapper) {
+                optionsWrapper.remove();
+            }
+
+            // Show completion message
+            const optionsArea = document.querySelector('.options-area');
+            const completionMessage = document.createElement('div');
+            completionMessage.className = 'completion-message';
+            completionMessage.textContent = 'Categorical data processing complete!';
+            optionsArea.appendChild(completionMessage);
+
+            alert('Empty fields handled successfully!');
+        } else {
+            throw new Error(data.error || 'Failed to handle empty fields');
+        }
+    })
+    .catch(err => {
+        console.error('Error handling empty categorical fields:', err);
         alert(`Error: ${err.message}`);
     })
     .finally(() => {
