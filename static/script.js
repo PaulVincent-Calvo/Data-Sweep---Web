@@ -370,7 +370,7 @@ function submitClassifications() {
                 .filter(([_, type]) => type === 'Categorical')
                 .map(([column]) => column);
 
-            // Handle each type in sequence
+            // Start with non-categorical data
             if (nameColumns.length > 0) {
                 handleNonCategoricalData(nameColumns, classifications);
             } else if (dateColumns.length > 0) {
@@ -378,6 +378,10 @@ function submitClassifications() {
             } else if (categoricalColumns.length > 0) {
                 handleCategoricalData(categoricalColumns, classifications);
             }
+
+            // Store the remaining columns for later use
+            sessionStorage.setItem('remainingDateColumns', JSON.stringify(dateColumns));
+            sessionStorage.setItem('remainingCategoricalColumns', JSON.stringify(categoricalColumns));
         } else {
             throw new Error(data.error || 'Failed to submit classifications');
         }
@@ -637,6 +641,7 @@ function handleFormatSubmit(columns, type) {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            // Update table
             csvArea.innerHTML = data.table;
             const table = csvArea.querySelector('table');
             if (table) {
@@ -649,13 +654,19 @@ function handleFormatSubmit(columns, type) {
                 optionsWrapper.remove();
             }
 
-            // Handle next step based on type
-            if (type === 'Date') {
-                // After date formatting, check if there are categorical columns
-                const categoricalColumns = Array.from(document.querySelectorAll('.classification-select'))
-                    .filter(select => select.value === 'Categorical')
-                    .map(select => select.id.replace('classification-', ''));
-                
+            // Chain to next type
+            if (type === 'Non-categorical') {
+                const dateColumns = JSON.parse(sessionStorage.getItem('remainingDateColumns') || '[]');
+                if (dateColumns.length > 0) {
+                    handleDateData(dateColumns);
+                } else {
+                    const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
+                    if (categoricalColumns.length > 0) {
+                        handleCategoricalData(categoricalColumns);
+                    }
+                }
+            } else if (type === 'Date') {
+                const categoricalColumns = JSON.parse(sessionStorage.getItem('remainingCategoricalColumns') || '[]');
                 if (categoricalColumns.length > 0) {
                     handleCategoricalData(categoricalColumns);
                 }
