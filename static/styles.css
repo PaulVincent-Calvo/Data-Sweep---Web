@@ -61,6 +61,10 @@ header {
     border-radius: 5px;
     cursor: pointer;
     margin: 10px 0; 
+    height: 45px; /* Add fixed height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .upload-button:hover {
@@ -246,11 +250,14 @@ header {
 
 .buttons-container {
     display: flex;
-    height: 10%;
+    height: 65px; /* Add fixed height to accommodate button height + margins */
     gap: 10px;
     width: 100%;
     justify-content: center;
     background: white;
+    border-top: 2px solid #E0E0E1;
+    padding: 10px 0;
+    margin: 0;
 }
 
 .skip-button {
@@ -263,6 +270,10 @@ header {
     border-radius: 5px;
     cursor: pointer;
     margin: 10px 0; 
+    height: 45px; /* Add fixed height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .delete-button {
@@ -275,6 +286,10 @@ header {
     border-radius: 5px;
     cursor: pointer;
     margin: 10px 0; 
+    height: 45px; /* Add fixed height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .skip-button:hover {
@@ -362,6 +377,7 @@ header {
     color: #333;
     background-color: white;
     cursor: pointer;
+    width: 200px;
 }
 
 .classification-select:hover {
@@ -376,13 +392,15 @@ header {
 
 /* Add submit button container similar to buttons-container */
 .submit-button-container {
-    height:10%;
+    height: 65px; /* Add fixed height to accommodate button height + margins */
     display: flex;
     width: 100%;
     justify-content: center;
     align-items: center;
     background: white;
+    border-top: 2px solid #E0E0E1;
     padding: 10px 0;
+    margin: 0;
 }
 
 .submit-button {
@@ -395,80 +413,14 @@ header {
     border-radius: 5px;
     cursor: pointer;
     margin: 10px 0;
+    height: 45px; /* Add fixed height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .submit-button:hover {
     background-color: #008C3A;
-}
-
-/* Name cleaning options styling */
-.name-format-options, .name-empty-options {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 90%;
-    background: white;
-}
-
-/* Style the titles similar to classification title */
-.name-format-options h3, .name-empty-options h3 {
-    margin: 0;
-    padding: 10px 15px;
-    background: white;
-    color: #181B1E;
-    border-bottom: 2px solid #E0E0E1;
-}
-
-/* Container for the list of items */
-.name-options-list {
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-}
-
-.name-column-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    font-size: 14px;
-    padding: 10px 15px;
-    background: white;
-    border-bottom: 2px solid #E0E0E1;
-}
-
-/* Button containers at bottom */
-.format-button-container, .empty-button-container {
-    display: flex;
-    height: 10%;
-    width: 100%;
-    justify-content: center;
-    align-items: center;
-    background: white;
-    border-top: 2px solid #E0E0E1;
-    margin-top: auto;
-}
-
-
-.format-submit-button, .empty-submit-button, .next-step-button {
-    padding: 10px 20px;
-    font-size: 16px;
-    font-weight: bold;
-    color: white;
-    background-color: #00AD46;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin: 10px 0;
-}
-
-.format-submit-button:hover, .empty-submit-button:hover, .next-step-button:hover {
-    background-color: #008C3A;
-}
-
-.next-step-button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
 }
 
 /* Update dropdown styling to be consistent */
@@ -489,6 +441,146 @@ header {
 }
 
 .format-select:focus, .classification-select:focus {
+    outline: none;
+    border-color: #00AD46;
+    box-shadow: 0 0 0 2px rgba(0, 173, 70, 0.2);
+}
+
+/* Options wrapper and container styling */
+.options-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.options-container {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    margin-bottom: 10px;
+}
+
+.format-options {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.format-options h3 {
+    margin: 0;
+    padding: 15px;
+    background: white;
+    color: #181B1E;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+.options-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.column-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    background: white;
+    border-bottom: 1px solid #E0E0E1;
+}
+
+.column-item:last-child {
+    border-bottom: none;
+}
+
+.button-container {
+    height: 65px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: white;
+    border-top: 2px solid #E0E0E1;
+    padding: 10px 0;
+    margin: 0;
+}
+
+/* Update select styling for consistency */
+.format-select {
+    padding: 8px 12px;
+    border: 2px solid #E0E0E1;
+    border-radius: 4px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    color: #333;
+    background-color: white;
+    cursor: pointer;
+    width: 200px;
+}
+
+.format-select:hover {
+    border-color: #00AD46;
+}
+
+.format-select:focus {
+    outline: none;
+    border-color: #00AD46;
+    box-shadow: 0 0 0 2px rgba(0, 173, 70, 0.2);
+}
+
+/* Column Section Styling */
+.column-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 2px solid #E0E0E1;
+    border-radius: 5px;
+}
+
+.column-section h4 {
+    margin: 0 0 10px 0;
+    color: #181B1E;
+}
+
+.unique-values-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.value-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.value-item p {
+    margin: 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.standardize-select {
+    padding: 8px 12px;
+    border: 2px solid #E0E0E1;
+    border-radius: 4px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    color: #333;
+    background-color: white;
+    cursor: pointer;
+    width: 200px;
+}
+
+.standardize-select:hover {
+    border-color: #00AD46;
+}
+
+.standardize-select:focus {
     outline: none;
     border-color: #00AD46;
     box-shadow: 0 0 0 2px rgba(0, 173, 70, 0.2);
