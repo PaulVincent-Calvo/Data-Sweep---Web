@@ -77,6 +77,20 @@ def delete_columns():
         # Delete selected columns
         df = df.drop(columns=columns_to_delete)
         
+        # Check if any columns remain
+        if len(df.columns) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Cannot delete all columns. At least one column must remain.'
+            }), 400
+            
+        # Check if any rows remain
+        if len(df) == 0:
+            return jsonify({
+                'success': False,
+                'error': 'No data rows remaining after deletion.'
+            }), 400
+        
         # Save the modified CSV
         df.to_csv(filepath, index=False)
         

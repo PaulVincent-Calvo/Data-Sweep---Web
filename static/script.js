@@ -10,6 +10,26 @@ blurOverlay.className = 'blur-overlay';
 document.body.appendChild(blurOverlay);
 blurOverlay.style.display = 'none';
 
+function showErrorPopup(message) {
+    const popup = document.getElementById('error-popup');
+    const errorMessage = document.getElementById('error-message');
+    const closeBtn = popup.querySelector('.popup-close');
+    
+    errorMessage.textContent = message;
+    popup.style.display = 'block';
+
+    closeBtn.onclick = function() {
+        popup.style.display = 'none';
+    }
+
+    // Close on outside click
+    window.onclick = function(event) {
+        if (event.target == popup) {
+            popup.style.display = 'none';
+        }
+    }
+}
+
 // Prevent double triggering of file input dialog
 uploadButton.addEventListener('click', (e) => {
   e.stopPropagation(); // Stop the event from propagating to the dropArea
@@ -59,7 +79,7 @@ function uploadFile(file) {
       mainContent.classList.remove('blurred');
 
       if (data.error) {
-        alert(data.error);
+        console.log(data.error);
       } else if (data.success && data.columns) {
         // Hide the drop area
         dropArea.style.display = 'none';
@@ -142,7 +162,7 @@ function uploadFile(file) {
                 .map(cb => cb.value);
 
             if (columnsToDelete.length === 0) {
-                alert('Please select columns to delete');
+                console.log('Please select columns to delete');
                 return;
             }
 
@@ -181,7 +201,13 @@ function uploadFile(file) {
                     // Show classification interface
                     showClassificationInterface();
                 } else {
-                    alert('Error deleting columns');
+                    if (data.error.includes('Cannot delete all columns')) {
+                        showErrorPopup('You must keep at least one column in the table');
+                    } else if (data.error.includes('No data rows remaining')) {
+                        showErrorPopup('Cannot delete all rows from the table');
+                    } else {
+                        showErrorPopup('Error deleting columns');
+                    }
                 }
             })
             .finally(() => {
@@ -301,7 +327,7 @@ function showClassificationInterface() {
         optionsArea.appendChild(classificationContainer);
     })
     .catch(err => {
-        alert(`Error loading classification interface: ${err.message}`);
+        console.log(`Error loading classification interface: ${err.message}`);
     });
 }
 
@@ -328,7 +354,7 @@ function submitClassifications() {
     });
 
     if (!isValid) {
-        alert('Please classify all columns before submitting');
+        console.log('Please classify all columns before submitting');
         return;
     }
 
@@ -593,6 +619,17 @@ function handleEmptyFieldSubmit(columns, type, formatContainer) {
             // Update table
             csvArea.innerHTML = data.table;
             const table = csvArea.querySelector('table');
+            
+            // Check if all data was deleted
+            if (!table || !table.rows || table.rows.length <= 1) { // Only header row or no rows
+                // Show warning and reload page
+                console.log('All data has been deleted. Returning to upload page...');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+                return;
+            }
+
             if (table) {
                 table.classList.add('table', 'table-striped', 'table-bordered');
             }
@@ -655,9 +692,18 @@ function handleFormatSubmit(columns, type) {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            // Update table
             csvArea.innerHTML = data.table;
             const table = csvArea.querySelector('table');
+            
+            // Check if all data was deleted
+            if (!table || !table.rows || table.rows.length <= 1) {
+                console.log('No data remaining after processing. Returning to upload page...');
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+                return;
+            }
+
             if (table) {
                 table.classList.add('table', 'table-striped', 'table-bordered');
             }
@@ -717,13 +763,13 @@ function handleFormatSubmit(columns, type) {
                 }
             }
 
-            alert(`${type} formatting applied successfully!`);
+            console.log(`${type} formatting applied successfully!`);
         } else {
             throw new Error(data.error || `Failed to apply ${type.toLowerCase()} formats`);
         }
     })
     .catch(err => {
-        alert(`Error: ${err.message}`);
+        console.log(`Error: ${err.message}`);
     })
     .finally(() => {
         loadingSpinner.hidden = true;
@@ -980,7 +1026,7 @@ function handleStandardizationSubmit(columns, uniqueValues) {
                     }
                 });
 
-            alert('Standardization applied successfully!');
+            console.log('Standardization applied successfully!');
         } else {
             throw new Error(data.error || 'Failed to apply standardization');
         }
@@ -1081,7 +1127,7 @@ function handleCategoricalEmptyFieldSubmit(columns) {
                 handleNumericalData(numericalColumns);
             }
 
-            alert('Empty fields handled successfully!');
+            console.log('Empty fields handled successfully!');
         } else {
             throw new Error(data.error || 'Failed to handle empty fields');
         }
@@ -1124,7 +1170,7 @@ function handleNumericalData(columns) {
 
     const selects = roundingContainer.querySelectorAll('.format-select');
     selects.forEach(select => {
-        select.style.width = '250px';
+        select.style.width = '300px';
     });
 
     optionsWrapper.appendChild(roundingContainer);
@@ -1142,7 +1188,7 @@ function handleRoundingSubmit(columns) {
     });
 
     if (Object.values(selections).some(val => !val)) {
-        alert('Please select rounding precision for all columns');
+        console.log('Please select rounding precision for all columns');
         return;
     }
 
@@ -1186,7 +1232,7 @@ function handleRoundingSubmit(columns) {
                     }
                 });
 
-            alert('Numerical formatting applied successfully!');
+            console.log('Numerical formatting applied successfully!');
         } else {
             throw new Error(data.error || 'Failed to apply numerical formatting');
         }
@@ -1211,9 +1257,9 @@ function handleNumericalEmptyFields(columns) {
             if (data.hasEmptyFields) {
                 const emptyFieldsOptions = [
                     { value: 'delete-empty-rows', label: 'Delete empty rows' },
-                    { value: 'fill-mean', label: 'Fill with mean value' },
-                    { value: 'fill-median', label: 'Fill with median value' },
-                    { value: 'fill-mode', label: 'Fill with mode value' }
+                    { value: 'fill-mean', label: 'Fill with mean' },
+                    { value: 'fill-median', label: 'Fill with median' },
+                    { value: 'fill-mode', label: 'Fill with mode' }
                 ];
 
                 const emptyContainer = createOptionsContainer(
@@ -1285,7 +1331,7 @@ function handleNumericalEmptyFieldSubmit(columns) {
             // Check if all processing is complete
             checkAllProcessingComplete();
 
-            alert('Empty fields handled successfully!');
+            console.log('Empty fields handled successfully!');
         } else {
             throw new Error(data.error || 'Failed to handle empty fields');
         }
@@ -1355,7 +1401,7 @@ function handleDownload() {
         }, 1000);
     })
     .catch(err => {
-        alert('Error downloading file');
+        console.log('Error downloading file');
     });
 }
 
