@@ -408,46 +408,43 @@ def apply_date_formats():
 
         data = request.get_json()
         selections = data.get('selections', {})
-        
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
-        if not os.path.exists(filepath):
-            return jsonify({'error': 'File not found'}), 400
-            
+        
         df = pd.read_csv(filepath)
         
-        # Process each date column according to the format choice
+        # Process each date column
         for column, format_type in selections.items():
             try:
-                # Convert to datetime while preserving original values for invalid dates
+                # Store original values
                 original_values = df[column].copy()
-                df[column] = pd.to_datetime(df[column], errors='coerce')
+                
+                # Convert to datetime WITHOUT formatting first
+                temp_series = pd.to_datetime(df[column], format='mixed', errors='coerce')
                 
                 # Create mask for valid dates
-                valid_dates = df[column].notna()
+                valid_dates = temp_series.notna()
                 
                 # Format valid dates according to selection
-                if format_type == 'mm/dd/yyyy':
-                    df.loc[valid_dates, column] = df.loc[valid_dates, column].dt.strftime('%m/%d/%Y')
-                elif format_type == 'dd/mm/yyyy':
-                    df.loc[valid_dates, column] = df.loc[valid_dates, column].dt.strftime('%d/%m/%Y')
-                elif format_type == 'yyyy/mm/dd':
-                    df.loc[valid_dates, column] = df.loc[valid_dates, column].dt.strftime('%Y/%m/%d')
-                elif format_type == 'mm-dd-yyyy':
-                    df.loc[valid_dates, column] = df.loc[valid_dates, column].dt.strftime('%m-%d-%Y')
-                elif format_type == 'dd-mm-yyyy':
-                    df.loc[valid_dates, column] = df.loc[valid_dates, column].dt.strftime('%d-%m-%Y')
-                elif format_type == 'yyyy-mm-dd':
-                    df.loc[valid_dates, column] = df.loc[valid_dates, column].dt.strftime('%Y-%m-%d')
+                format_mapping = {
+                    'mm/dd/yyyy': '%m/%d/%Y',
+                    'dd/mm/yyyy': '%d/%m/%Y',
+                    'yyyy/mm/dd': '%Y/%m/%d',
+                    'mm-dd-yyyy': '%m-%d-%Y',
+                    'dd-mm-yyyy': '%d-%m-%Y',
+                    'yyyy-mm-dd': '%Y-%m-%d'
+                }
                 
-                # Restore original values for invalid dates
+                if format_type in format_mapping:
+                    pattern = format_mapping[format_type]
+                    # Format only valid dates using the selected format
+                    df.loc[valid_dates, column] = temp_series[valid_dates].dt.strftime(pattern)
+                    
+                # Keep original values for invalid dates
                 df.loc[~valid_dates, column] = original_values[~valid_dates]
                 
             except Exception as e:
-                print(f"Error processing column {column}: {str(e)}")  # Debug print
-                return jsonify({
-                    'success': False,
-                    'error': f'Error formatting date column {column}: {str(e)}'
-                }), 400
+                print(f"Error processing column {column}: {str(e)}")
+                continue
         
         # Save the modified DataFrame
         df.to_csv(filepath, index=False)
@@ -461,7 +458,7 @@ def apply_date_formats():
         })
         
     except Exception as e:
-        print(f"General error: {str(e)}")  # Debug print
+        print(f"General error: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -532,36 +532,68 @@ header {
 
 /* Column Section Styling */
 .column-section {
-    margin-bottom: 20px;
-    padding: 15px;
-    border: 2px solid #E0E0E1;
-    border-radius: 5px;
+    margin-bottom: 0;
+    border: none;
 }
 
 .column-section h4 {
-    margin: 0 0 10px 0;
+    margin: 0;
+    padding: 15px;
     color: #181B1E;
+    border-top: 1px solid #E0E0E1;
+    border-bottom: 1px solid #E0E0E1;
+}
+
+/* Update Value Items Styling */
+.value-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    background: white;
+    border-bottom: 1px solid #E0E0E1;
+    margin: 0;
+    gap: 10px;
+}
+
+.value-item p {
+    margin: 0;
+    padding-left: 15px;
+}
+
+.value-item select {
+    margin-right: 15px;
+}
+
+/* Format Options Title */
+.format-options h3 {
+    margin: 0;
+    padding: 15px;
+    background: white;
+    color: #181B1E;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+/* Update Value Items Styling */
+.value-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 15px;
+    background: white;
+    border-bottom: 1px solid #E0E0E1;
+    margin: 0;  /* Remove any margin */
+    gap: 10px;  /* Add consistent gap between text and dropdown */
+}
+
+.value-item:last-child {
+    border-bottom: none;
 }
 
 .unique-values-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-}
-
-.value-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-
-.value-item p {
-    margin: 0;
-    font-size: 14px;
-    color: #333;
+    gap: 0;  /* Remove gap between value items */
 }
 
 .standardize-select {

@@ -370,41 +370,13 @@ function submitClassifications() {
                 .filter(([_, type]) => type === 'Categorical')
                 .map(([column]) => column);
 
-            // Create a function to handle the next step
-            const handleDateFormatting = () => {
-                if (dateColumns.length > 0) {
-                    handleDateData(dateColumns, classifications);
-                }
-            };
-
-            const handleCategoricalFormatting = () => {
-                if (categoricalColumns.length > 0) {
-                    handleCategoricalData(categoricalColumns, classifications);
-                }
-            };
-
-            // Start with non-categorical data if present
+            // Handle each type in sequence
             if (nameColumns.length > 0) {
                 handleNonCategoricalData(nameColumns, classifications);
-                // Store date and categorical columns for later use
-                if (dateColumns.length > 0 || categoricalColumns.length > 0) {
-                    // Add event listener for when non-categorical formatting is complete
-                    const checkFormatComplete = setInterval(() => {
-                        const optionsWrapper = document.querySelector('.options-wrapper');
-                        if (!optionsWrapper || optionsWrapper.style.display === 'none') {
-                            clearInterval(checkFormatComplete);
-                            handleDateFormatting();
-                            handleCategoricalFormatting();
-                        }
-                    }, 100);
-                }
             } else if (dateColumns.length > 0) {
-                // If no non-categorical data, proceed with date formatting
-                handleDateFormatting();
-                handleCategoricalFormatting();
+                handleDateData(dateColumns, classifications);
             } else if (categoricalColumns.length > 0) {
-                // If no non-categorical or date data, proceed with categorical formatting
-                handleCategoricalFormatting();
+                handleCategoricalData(categoricalColumns, classifications);
             }
         } else {
             throw new Error(data.error || 'Failed to submit classifications');
@@ -435,7 +407,6 @@ function checkEmptyFields(columns, classificationType) {
     .then(res => res.json());
 }
 
-// Add this helper function to create standardized option containers
 function createOptionsContainer(title, columns, options, handleSubmit, submitButtonText) {
     const container = document.createElement('div');
     container.className = 'options-container';
@@ -640,11 +611,8 @@ function handleFormatSubmit(columns, type) {
         const select = document.querySelector(`#format-${safeColumnId}`);
         if (select) {
             selections[column] = select.value;
-            console.log(`Formatting ${column} with ${select.value}`); // Debug log
         }
     });
-
-    console.log('Type:', type); // Debug log to verify we're getting 'Categorical'
 
     loadingSpinner.hidden = false;
     blurOverlay.style.display = 'block';
@@ -658,8 +626,6 @@ function handleFormatSubmit(columns, type) {
     } else {
         endpoint = '/apply-formats';
     }
-
-    console.log('Using endpoint:', endpoint); // Debug log
 
     fetch(endpoint, {
         method: 'POST',
@@ -677,15 +643,23 @@ function handleFormatSubmit(columns, type) {
                 table.classList.add('table', 'table-striped', 'table-bordered');
             }
 
-            // Remove the options wrapper first
+            // Remove the options wrapper
             const optionsWrapper = document.querySelector('.options-wrapper');
             if (optionsWrapper) {
-                optionsWrapper.remove(); // Change from hide to remove
+                optionsWrapper.remove();
             }
 
-            // Show standardization screen for categorical data
-            if (type === 'Categorical') {
-                console.log('Showing standardization screen for columns:', columns); // Debug log
+            // Handle next step based on type
+            if (type === 'Date') {
+                // After date formatting, check if there are categorical columns
+                const categoricalColumns = Array.from(document.querySelectorAll('.classification-select'))
+                    .filter(select => select.value === 'Categorical')
+                    .map(select => select.id.replace('classification-', ''));
+                
+                if (categoricalColumns.length > 0) {
+                    handleCategoricalData(categoricalColumns);
+                }
+            } else if (type === 'Categorical') {
                 handleCategoricalStandardization(columns);
             }
 
@@ -817,9 +791,12 @@ function createStandardizationContainer(columns, uniqueValues) {
     const container = document.createElement('div');
     container.className = 'options-container';
 
+    const optionsDiv = document.createElement('div');
+    optionsDiv.className = 'format-options';
+
     const title = document.createElement('h3');
     title.textContent = 'Standardize Categorical Values';
-    container.appendChild(title);
+    optionsDiv.appendChild(title);
 
     const columnsList = document.createElement('div');
     columnsList.className = 'options-list';
@@ -869,7 +846,8 @@ function createStandardizationContainer(columns, uniqueValues) {
         columnsList.appendChild(columnSection);
     });
 
-    container.appendChild(columnsList);
+    optionsDiv.appendChild(columnsList);
+    container.appendChild(optionsDiv);
 
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'submit-button-container';
