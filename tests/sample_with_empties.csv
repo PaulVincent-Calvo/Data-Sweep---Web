@@ -1,0 +1,8 @@
+Name,Category,Value,Date
+Alice,A,100,2023-01-01
+Bob,,200,2023-01-02
+Charlie,B,,2023-01-03
+David,C,400,
+,A,500,2023-01-05
+Frank,<NA>,600,2023-01-06
+Grace,B,700,NaN 
