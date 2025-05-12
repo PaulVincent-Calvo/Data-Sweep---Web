@@ -1224,11 +1224,13 @@ function handleRoundingSubmit(columns) {
                 optionsWrapper.remove();
             }
 
-            // Chain to empty fields handling
             checkEmptyFields(columns, 'Numerical')
                 .then(data => {
                     if (data.hasEmptyFields) {
                         handleNumericalEmptyFields(columns);
+                    } else {
+                        sessionStorage.setItem('remainingNumericalColumns', '[]');
+                        checkAllProcessingComplete();
                     }
                 });
 
