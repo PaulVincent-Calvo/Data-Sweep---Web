@@ -88,10 +88,3 @@ Many users often struggle with disorganized, inconsistent, or error-prone datase
 - No login system or user accounts
 - Users must define their own cleaning preferences
 
----
-
-## 🧱 System Architecture
-
-- **Presentation Layer**: HTML, CSS, JavaScript (Frontend UI)
-- **Application Layer**: Python & Flask (Handles cleaning logic and routes)
-- **Data Layer**: Temporary in-memory storage using Pandas
