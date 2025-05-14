@@ -17,18 +17,6 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-def check_duplicates(df):
-    """Check for duplicate rows in the dataframe"""
-    duplicate_count = df.duplicated().sum()
-    return bool(duplicate_count), duplicate_count
-
-def remove_duplicate_rows(df):
-    """Remove duplicate rows from the dataframe"""
-    original_rows = len(df)
-    df = df.drop_duplicates()
-    rows_removed = original_rows - len(df)
-    return df, rows_removed
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -56,27 +44,15 @@ def upload_file():
         try:
             # Read CSV using pandas
             df = pd.read_csv(filepath)
-            if df.empty:
-                return jsonify({'error': 'The CSV file is empty'}), 400
-
-            # Store the dataframe in the session
-            session['df'] = df.to_json()
-
             # Get column names
             columns = df.columns.tolist()
             # Convert DataFrame to HTML table
             table_html = df.to_html(classes='table table-striped', index=False)
-
-            # Check for duplicates
-            has_duplicates, duplicate_count = check_duplicates(df)
-
             return jsonify({
                 'filename': filename,
                 'columns': columns,
                 'table': table_html,
-                'success': True,
-                'hasDuplicates': has_duplicates,
-                'duplicateCount': int(duplicate_count)
+                'success': True
             })
         except Exception as e:
             return jsonify({'error': f'Error reading CSV: {str(e)}'}), 400
@@ -91,7 +67,6 @@ def delete_columns():
 
         data = request.get_json()
         columns_to_delete = data.get('columns', [])
-        delete_duplicates = data.get('deleteDuplicates', False)
         
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], session['current_file'])
         if not os.path.exists(filepath):
@@ -101,10 +76,6 @@ def delete_columns():
         
         # Delete selected columns
         df = df.drop(columns=columns_to_delete)
-        
-        # Remove duplicates if requested
-        if delete_duplicates:
-            df, rows_removed = remove_duplicate_rows(df)
         
         # Check if any columns remain
         if len(df.columns) == 0:
