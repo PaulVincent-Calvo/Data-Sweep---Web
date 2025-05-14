@@ -49,7 +49,6 @@ Many users often struggle with disorganized, inconsistent, or error-prone datase
 - Accept only CSV files; reject others with clear error messages.
 - Dynamic preview of file content and real-time updates as cleaning operations are applied.
 - User-controlled cleaning options:
-  - Remove duplicates
   - Fill/delete missing values
   - Standardize text (UPPERCASE/lowercase)
   - Normalize date formats
