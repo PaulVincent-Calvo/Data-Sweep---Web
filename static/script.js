@@ -130,6 +130,36 @@ function uploadFile(file) {
           checklistContainer.appendChild(checkboxDiv);
         });
 
+        // Add duplicate rows checkbox if duplicates exist
+        if (data.hasDuplicates) {
+            // Add a separator div
+            const separatorDiv = document.createElement('div');
+            separatorDiv.className = 'duplicate-section';
+            
+            // Add title for duplicate section
+            const duplicateTitle = document.createElement('h2');
+            duplicateTitle.textContent = 'Handle Duplicate Rows:';
+            duplicateTitle.className = 'duplicate-title';
+            separatorDiv.appendChild(duplicateTitle);
+
+            const duplicateCheckDiv = document.createElement('div');
+            duplicateCheckDiv.className = 'checkbox-item duplicate-check';
+
+            const duplicateCheckbox = document.createElement('input');
+            duplicateCheckbox.type = 'checkbox';
+            duplicateCheckbox.id = 'delete-duplicates';
+            duplicateCheckbox.checked = false;
+
+            const duplicateLabel = document.createElement('label');
+            duplicateLabel.htmlFor = 'delete-duplicates';
+            duplicateLabel.textContent = `Delete ${data.duplicateCount} duplicate rows`;
+
+            duplicateCheckDiv.appendChild(duplicateCheckbox);
+            duplicateCheckDiv.appendChild(duplicateLabel);
+            separatorDiv.appendChild(duplicateCheckDiv);
+            checklistContainer.appendChild(separatorDiv);
+        }
+
         // Create buttons container
         const buttonsContainer = document.createElement('div');
         buttonsContainer.className = 'buttons-container';
@@ -141,7 +171,7 @@ function uploadFile(file) {
         
         // Create Delete Columns button
         const deleteButton = document.createElement('button');
-        deleteButton.textContent = 'Delete Columns';
+        deleteButton.textContent = 'Delete';
         deleteButton.className = 'delete-button';
 
         // Add buttons to container
@@ -155,14 +185,29 @@ function uploadFile(file) {
         // Add this after creating the delete button:
         deleteButton.addEventListener('click', () => {
             // Get all checkboxes
-            const checkboxes = document.querySelectorAll('.checkbox-item input[type="checkbox"]');
+            const checkboxes = document.querySelectorAll('.checkbox-item:not(.duplicate-check) input[type="checkbox"]');
             // Get checked columns to delete
             const columnsToDelete = Array.from(checkboxes)
                 .filter(cb => cb.checked)
                 .map(cb => cb.value);
 
-            if (columnsToDelete.length === 0) {
-                console.log('Please select columns to delete');
+            // Check duplicate checkbox
+            const deleteDuplicates = document.querySelector('#delete-duplicates')?.checked || false;
+
+            if (columnsToDelete.length === 0 && !deleteDuplicates) {
+                // Add invalid class to all checkboxes
+                checkboxes.forEach(checkbox => {
+                    checkbox.classList.add('invalid');
+                });
+
+                // Remove invalid class after 2 seconds
+                setTimeout(() => {
+                    checkboxes.forEach(checkbox => {
+                        checkbox.classList.remove('invalid');
+                    });
+                }, 2000);
+
+                console.log('Please select columns to delete or check delete duplicates');
                 return;
             }
 
@@ -177,7 +222,10 @@ function uploadFile(file) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ columns: columnsToDelete })
+                body: JSON.stringify({ 
+                    columns: columnsToDelete,
+                    deleteDuplicates: deleteDuplicates 
+                })
             })
             .then(res => res.json())
             .then(data => {
@@ -214,6 +262,14 @@ function uploadFile(file) {
                 loadingSpinner.hidden = true;
                 blurOverlay.style.display = 'none';
                 mainContent.classList.remove('blurred');
+            });
+        });
+
+        // Add click handler to remove invalid class when checkbox is clicked
+        const checkboxes = document.querySelectorAll('.checkbox-item input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                checkbox.classList.remove('invalid');
             });
         });
 
