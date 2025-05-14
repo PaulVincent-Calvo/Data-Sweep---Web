@@ -168,6 +168,14 @@ header {
     flex: 1;
 }
 
+.checkbox-item input[type="checkbox"].invalid + label {
+    color: red;
+}
+
+.checkbox-item input[type="checkbox"].invalid {
+    border-color: red;
+}
+
 #csv-area {
     display: flex;
     flex: 1;
@@ -793,11 +801,12 @@ header {
     cursor: pointer;
 }
 
+/* Update the duplicate check label styling */
 .duplicate-check label {
     cursor: pointer;
     flex: 1;
-    color: #dc3545;
-    font-weight: 500;
+    color: #333; /* Same color as other labels */
+    font-weight: normal; /* Remove any bold styling */
 }
 
 

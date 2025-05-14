@@ -195,6 +195,18 @@ function uploadFile(file) {
             const deleteDuplicates = document.querySelector('#delete-duplicates')?.checked || false;
 
             if (columnsToDelete.length === 0 && !deleteDuplicates) {
+                // Add invalid class to all checkboxes
+                checkboxes.forEach(checkbox => {
+                    checkbox.classList.add('invalid');
+                });
+
+                // Remove invalid class after 2 seconds
+                setTimeout(() => {
+                    checkboxes.forEach(checkbox => {
+                        checkbox.classList.remove('invalid');
+                    });
+                }, 2000);
+
                 console.log('Please select columns to delete or check delete duplicates');
                 return;
             }
@@ -250,6 +262,14 @@ function uploadFile(file) {
                 loadingSpinner.hidden = true;
                 blurOverlay.style.display = 'none';
                 mainContent.classList.remove('blurred');
+            });
+        });
+
+        // Add click handler to remove invalid class when checkbox is clicked
+        const checkboxes = document.querySelectorAll('.checkbox-item input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                checkbox.classList.remove('invalid');
             });
         });
 
