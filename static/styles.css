@@ -761,6 +761,45 @@ header {
   color: black;
 }
 
+/* Updated Duplicate Section Styling */
+.duplicate-section {
+    width: 100%;
+    background: white;
+    border-top: 2px solid #E0E0E1;
+}
+
+.duplicate-title {
+    margin: 0;
+    padding: 10px 15px;
+    background: white;
+    color: #181B1E;
+    border-bottom: 2px solid #E0E0E1;
+    font-size: inherit;
+}
+
+.duplicate-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    padding: 10px 15px;
+    background: white;
+    border-bottom: 2px solid #E0E0E1;
+}
+
+.duplicate-check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.duplicate-check label {
+    cursor: pointer;
+    flex: 1;
+    color: #dc3545;
+    font-weight: 500;
+}
+
 
 
 
