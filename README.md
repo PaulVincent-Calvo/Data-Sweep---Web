@@ -33,7 +33,6 @@ Many users often struggle with disorganized, inconsistent, or error-prone datase
 - **Researchers** – Quickly organize datasets for analysis.
 - **Entry-Level Data Analysts** – Avoid manual scripting with automated cleaning tools.
 - **Educators** – Prepare clean datasets for educational purposes.
-- **Small Business Owners** – Manage customer/inventory data with ease.
 
 ---
 
