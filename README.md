@@ -18,7 +18,6 @@ Many users often struggle with disorganized, inconsistent, or error-prone datase
 - ✅ Upload and validate CSV files (only `.csv`)
 - 🔍 Preview CSV content in an interactive table
 - 🧹 Perform automatic cleaning:
-  - Remove duplicate rows
   - Handle missing values (fill or delete)
   - Standardize text case and date formats
   - Remove empty rows and columns
